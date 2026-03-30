@@ -1,0 +1,44 @@
+# 🎙️ PIANIFICAZIONE: Runtime SoundMaster Pro
+## L'Universal Radio Sanitizer per Web Radio Moderne
+
+### 🎯 1. Visione del Progetto
+**Runtime SoundMaster Pro** si evolve in una suite universale per la gestione di webradio (Shoutcast, Icecast, RadioDJ, MB STUDIO, Azuracast). Il software funge da **"Filtro di Bonifica"** definitivo per pulire la library (volumi, duplicati, formati, metadati) prima del caricamento nel sistema di automazione.
+
+---
+
+### 🚀 2. Svolta Tecnologica: Perché Tauri?
+L'architettura viene migrata da Electron a **Tauri (Rust + React)**:
+1.  **Efficienza Rust**: Backend performante per I/O e FFmpeg.
+2.  **Leggerezza Estrema**: Bundle finale di 10-15MB.
+3.  **Basso Consumo**: Ideale per l'esecuzione in background.
+
+---
+
+### 🏛️ 3. Architettura "The Hub" (Dashboard Centrale)
+Dashboard "Command Center" pulita e professionale con design **Cyber-Soviet Dark Mode**. Navigazione centrale verso i tre moduli specializzati con ritorno rapido alla Home.
+
+---
+
+### 🧩 4. I Tre Moduli
+#### **Opzione A: The Cleaner (Deduplicatore)**
+- **Acoustic Fingerprinting**: Scansione impronta sonora.
+- **Auto-Pick Gold**: Suggerimento della copia migliore (Bitrate/Lossless).
+- **Safety Vault**: Quarantena prima dell'eliminazione.
+
+#### **Opzione B: The Conformer (Standardizzatore Radio)**
+- **Universal Radio Format**: MP3 192kbps CBR 44.1kHz.
+- **Loudness Normalization**: Standard **EBU R128**.
+- **Silent Trimming**: Rimozione silenzi a inizio/fine brano.
+
+#### **Opzione C: The Librarian (Catalogatore & Metadati)**
+- **Metadata Scrubbing**: Pulizia tag ID3 e fix maiuscole.
+- **Artwork Injection**: Embedding massivo cover art.
+- **SQLite Catalog**: Indice locale ultra-veloce per library 500.000+ brani.
+
+---
+
+### 🛠️ 5. Stack Tecnologico
+- **Backend**: Rust (Tauri Core).
+- **Frontend**: React 19 + Tailwind CSS 4 + Framer Motion.
+- **Database**: SQLite.
+- **Audio Engine**: FFmpeg integrato.

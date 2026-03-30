@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SOUNDMASTER PRO - THE CONFORMER</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-error": "#690005",
+                        "on-primary-container": "#107100",
+                        "on-error-container": "#ffdad6",
+                        "surface-bright": "#393939",
+                        "on-secondary-fixed": "#281800",
+                        "secondary-fixed-dim": "#ffba3f",
+                        "secondary-container": "#ffb211",
+                        "inverse-on-surface": "#313030",
+                        "tertiary-container": "#ffd3ce",
+                        "on-surface": "#e5e2e1",
+                        "on-primary": "#053900",
+                        "surface-container": "#201f1f",
+                        "tertiary-fixed": "#ffdad6",
+                        "surface-container-high": "#2a2a2a",
+                        "on-tertiary-fixed": "#410002",
+                        "outline": "#85967c",
+                        "on-secondary-container": "#6b4800",
+                        "primary-container": "#39ff14",
+                        "on-background": "#e5e2e1",
+                        "surface-container-low": "#1c1b1b",
+                        "surface-dim": "#131313",
+                        "on-tertiary-container": "#c50015",
+                        "primary-fixed-dim": "#2ae500",
+                        "surface-tint": "#2ae500",
+                        "outline-variant": "#3c4b35",
+                        "surface-container-lowest": "#0e0e0e",
+                        "error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#604100",
+                        "on-surface-variant": "#baccb0",
+                        "inverse-primary": "#106e00",
+                        "on-secondary": "#432c00",
+                        "inverse-surface": "#e5e2e1",
+                        "on-primary-fixed-variant": "#095300",
+                        "background": "#131313",
+                        "on-tertiary-fixed-variant": "#93000c",
+                        "error": "#ffb4ab",
+                        "secondary": "#ffd79b",
+                        "on-primary-fixed": "#022100",
+                        "surface": "#131313",
+                        "tertiary": "#fff8f7",
+                        "secondary-fixed": "#ffdeae",
+                        "tertiary-fixed-dim": "#ffb4ab",
+                        "surface-variant": "#353534",
+                        "primary": "#efffe3",
+                        "on-tertiary": "#690006",
+                        "primary-fixed": "#79ff5b",
+                        "surface-container-highest": "#353534"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0e0e0e; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #39ff14; }
+        .scanline {
+            background: linear-gradient(to bottom, transparent 50%, rgba(57, 255, 20, 0.05) 50%);
+            background-size: 100% 4px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden">
+<!-- Side Navigation Shell -->
+<aside class="fixed left-0 top-0 h-full w-64 border-r-4 border-[#201F1F] bg-[#131313] flex flex-col z-50">
+<div class="p-6 border-b-2 border-[#201F1F]">
+<h1 class="font-headline text-2xl font-black text-primary-container tracking-widest leading-none">SOUNDMASTER PRO</h1>
+<p class="font-headline text-[10px] tracking-[0.2em] text-on-surface-variant opacity-60 mt-1">V.2.04-ALFA</p>
+</div>
+<nav class="flex-grow py-4">
+<!-- Navigation Items Mapping -->
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150 font-headline uppercase tracking-tighter text-sm" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span>The Hub</span>
+</a>
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150 font-headline uppercase tracking-tighter text-sm" href="#">
+<span class="material-symbols-outlined">cleaning_services</span>
+<span>The Cleaner</span>
+</a>
+<a class="flex items-center gap-4 bg-[#2A2A2A] text-primary-container border-l-4 border-primary-container px-6 py-4 font-headline uppercase tracking-tighter text-sm" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+<span>The Conformer</span>
+</a>
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150 font-headline uppercase tracking-tighter text-sm" href="#">
+<span class="material-symbols-outlined">library_music</span>
+<span>The Librarian</span>
+</a>
+</nav>
+<div class="mt-auto p-4 border-t-2 border-[#201F1F]">
+<button class="w-full bg-primary-container text-on-primary font-headline font-black py-3 px-4 flex items-center justify-center gap-2 hover:bg-primary transition-colors">
+<span class="material-symbols-outlined text-sm">sync</span>
+<span>SYNC LIBRARY</span>
+</button>
+<div class="mt-4 flex flex-col gap-1">
+<a class="flex items-center gap-3 px-2 py-1 text-xs font-headline uppercase text-on-surface-variant hover:text-primary-container transition-colors" href="#">
+<span class="material-symbols-outlined text-base">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-3 px-2 py-1 text-xs font-headline uppercase text-on-surface-variant hover:text-primary-container transition-colors" href="#">
+<span class="material-symbols-outlined text-base">help_center</span>
+<span>Support</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 left-64 right-0 h-12 bg-surface-container border-b-2 border-surface-container-lowest flex justify-between items-center px-6 z-40">
+<div class="flex items-center gap-8">
+<span class="font-headline font-black text-primary-container text-lg tracking-tight">RUNTIME SOUNDMASTER PRO</span>
+<div class="hidden md:flex gap-6 items-center">
+<span class="font-mono text-[10px] text-primary-container bg-primary-container/10 px-2 py-0.5 border border-primary-container/20">SYSTEM STATUS: OPTIMAL</span>
+<span class="font-mono text-[10px] text-on-surface-variant">LIBRARY: /ROOT/AUDIO_ARCHIVE</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-lowest border border-outline-variant/30">
+<span class="material-symbols-outlined text-sm text-on-surface-variant">search</span>
+<input class="bg-transparent border-none outline-none text-[10px] font-mono text-on-surface placeholder:text-on-surface-variant/40 w-32 focus:ring-0" placeholder="QUERY_ARCHIVE..." type="text"/>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary-container cursor-crosshair">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary-container cursor-crosshair">terminal</span>
+<button class="font-mono text-[10px] font-bold text-on-primary bg-primary-container px-3 py-1 hover:brightness-110 active:scale-95 transition-all">EXPORT</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 mt-12 h-[calc(100vh-3rem)] grid grid-cols-12 gap-0 overflow-hidden relative">
+<!-- Left Panel: Configuration Parameters -->
+<section class="col-span-4 border-r-2 border-surface-container-lowest bg-surface-dim p-8 flex flex-col gap-8 custom-scrollbar overflow-y-auto">
+<div class="flex flex-col gap-2">
+<h2 class="font-headline text-3xl font-black text-on-surface tracking-tighter">PARAMETERS</h2>
+<div class="h-1 w-12 bg-primary-container"></div>
+</div>
+<!-- Setting Block 1 -->
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-end border-b border-outline-variant/30 pb-2">
+<span class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest">Output Format</span>
+<span class="font-mono text-xs text-secondary-container">MP3 192KBPS CBR</span>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<button class="bg-surface-container-high border border-outline-variant/20 p-3 text-left font-mono text-[10px] text-on-surface hover:border-primary-container transition-colors relative group">
+<div class="absolute inset-0 bg-primary-container/5 opacity-0 group-hover:opacity-100"></div>
+                        WAV / LOSSLESS
+                    </button>
+<button class="bg-surface-container-lowest border border-primary-container p-3 text-left font-mono text-[10px] text-primary-container relative">
+<div class="absolute top-1 right-1 w-1 h-1 bg-primary-container"></div>
+                        MP3 / STANDARD
+                    </button>
+</div>
+</div>
+<!-- Setting Block 2 -->
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-end border-b border-outline-variant/30 pb-2">
+<span class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest">Normalization</span>
+<span class="font-mono text-xs text-secondary-container">EBU R128</span>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center bg-surface-container-lowest p-3 border-l-2 border-secondary-container">
+<span class="font-mono text-[10px] text-on-surface">TARGET LOUDNESS</span>
+<span class="font-mono text-xs text-secondary-container">-23.0 LUFS</span>
+</div>
+<div class="bg-surface-container-high h-1 w-full relative">
+<div class="absolute left-0 top-0 h-full bg-secondary-container w-[70%]"></div>
+</div>
+</div>
+</div>
+<!-- Setting Block 3 -->
+<div class="flex flex-col gap-6">
+<div class="flex justify-between items-end border-b border-outline-variant/30 pb-2">
+<span class="font-headline text-xs font-bold text-on-surface-variant uppercase tracking-widest">Silent Trim</span>
+<span class="font-mono text-xs text-primary-container">ACTIVE / ON</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-12 h-6 bg-surface-container-lowest border border-outline-variant relative flex items-center px-1">
+<div class="w-4 h-4 bg-primary-container shadow-[0_0_10px_rgba(57,255,20,0.5)] translate-x-6"></div>
+</div>
+<p class="font-mono text-[10px] text-on-surface-variant leading-relaxed">
+                        AUTOMATICALLY TRUNCATE SIGNAL BELOW -60DB AT HEAD AND TAIL.
+                    </p>
+</div>
+</div>
+<!-- Decorative Schematic Component -->
+<div class="mt-auto pt-8 opacity-20 flex flex-col gap-2 pointer-events-none">
+<div class="h-px w-full bg-outline-variant"></div>
+<div class="flex justify-between font-mono text-[8px] uppercase">
+<span>Signal Path v.4.0</span>
+<span>Matrix Protocol Enforced</span>
+</div>
+<img class="w-full grayscale invert h-24 object-cover" data-alt="Technical schematic drawing of a digital audio processor circuit board with neon green lines on black background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWYO5iArZ4y50hYZ9KeLPknwLeAfKZL0QHujPQtIm6kwayX48RqXgbg6VEWsYr29RzHs0CIJ6CUWxwy4oOFLdq4m2BwquOE-3Rk4vq9wg1-q5vBaI9A2NbLZoZmxVuqhED7i80ZshG0tPqxxK-wIbv_aMMT0v4kDemau7TlIRXeearlOtQDr_MiVFgcXtqgN_m7-sX0JAICOt2SIv2QSMMHBx2UinghmRFcRr8_WuozXoEhbLZPK4rLv-sTHglBdoSSV6KlZblaIq4"/>
+</div>
+</section>
+<!-- Right Panel: Batch Queue -->
+<section class="col-span-8 bg-surface-container-lowest p-8 flex flex-col gap-6 relative">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="w-3 h-3 bg-secondary-container animate-pulse"></div>
+<h2 class="font-headline text-xl font-black text-on-surface tracking-widest uppercase">Batch Processing Queue</h2>
+</div>
+<span class="font-mono text-[10px] text-on-surface-variant px-3 py-1 border border-outline-variant/30">FILES IN BUFFER: 04</span>
+</div>
+<!-- Queue Container -->
+<div class="flex-grow flex flex-col gap-4 overflow-y-auto pr-4 custom-scrollbar">
+<!-- Queue Item 1 -->
+<div class="bg-surface-container border-l-4 border-secondary-container p-6 flex flex-col gap-4 relative overflow-hidden group">
+<div class="absolute top-0 right-0 p-2 font-mono text-[8px] text-on-surface-variant opacity-40">UUID: 8F2-X44</div>
+<div class="flex justify-between items-start z-10">
+<div class="flex flex-col">
+<h3 class="font-headline font-bold text-on-surface text-lg tracking-tight uppercase">Master_Vocal_Take_04.wav</h3>
+<div class="flex items-center gap-4 mt-1">
+<span class="font-mono text-[10px] text-secondary-container">STATUS: CONFORMING</span>
+<span class="font-mono text-[10px] text-on-surface-variant">SIZE: 42.1 MB</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-mono text-2xl font-black text-secondary-container tracking-tighter">74%</span>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-4 items-center">
+<!-- Waveform Mock -->
+<div class="col-span-9 bg-surface-container-lowest h-16 border border-outline-variant/20 relative overflow-hidden">
+<div class="absolute inset-0 flex items-center justify-around px-2 gap-[2px]">
+<!-- Synthetic Waveform Bar Graph -->
+<div class="w-1 h-3 bg-secondary-container/20"></div>
+<div class="w-1 h-2 bg-secondary-container/20"></div>
+<div class="w-1 h-8 bg-secondary-container"></div>
+<div class="w-1 h-12 bg-secondary-container"></div>
+<div class="w-1 h-6 bg-secondary-container"></div>
+<div class="w-1 h-10 bg-secondary-container"></div>
+<div class="w-1 h-4 bg-secondary-container"></div>
+<div class="w-1 h-12 bg-secondary-container"></div>
+<div class="w-1 h-10 bg-secondary-container"></div>
+<div class="w-1 h-8 bg-secondary-container"></div>
+<div class="w-1 h-4 bg-secondary-container/20"></div>
+<div class="w-1 h-1 bg-secondary-container/20"></div>
+</div>
+<!-- Silent Trim Marker -->
+<div class="absolute left-0 top-0 bottom-0 w-8 bg-error/20 border-r border-error flex items-center justify-center">
+<span class="font-mono text-[8px] text-error rotate-90 uppercase">TRIM_L</span>
+</div>
+<div class="absolute right-0 top-0 bottom-0 w-4 bg-error/20 border-l border-error"></div>
+<!-- Progress Overlay -->
+<div class="absolute top-0 left-0 bottom-0 w-[74%] bg-secondary-container/10 border-r border-secondary-container"></div>
+</div>
+<div class="col-span-3 flex flex-col gap-2">
+<div class="flex justify-between font-mono text-[8px] text-on-surface-variant">
+<span>PEAK</span>
+<span class="text-on-surface">-1.2 dB</span>
+</div>
+<div class="flex justify-between font-mono text-[8px] text-on-surface-variant">
+<span>RMS</span>
+<span class="text-on-surface">-14.8 dB</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Queue Item 2 -->
+<div class="bg-surface-container-high border-l-4 border-outline-variant p-6 flex flex-col gap-4 opacity-80">
+<div class="flex justify-between items-start">
+<div class="flex flex-col">
+<h3 class="font-headline font-bold text-on-surface text-lg tracking-tight uppercase">Ambient_Drone_Complex_X.aiff</h3>
+<div class="flex items-center gap-4 mt-1">
+<span class="font-mono text-[10px] text-on-surface-variant">STATUS: QUEUED</span>
+<span class="font-mono text-[10px] text-on-surface-variant">SIZE: 128.5 MB</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-mono text-2xl font-black text-on-surface-variant tracking-tighter">0%</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest h-1 flex items-center">
+<div class="w-0 h-full bg-primary-container"></div>
+</div>
+</div>
+<!-- Queue Item 3 -->
+<div class="bg-surface-container border-l-4 border-secondary-container p-6 flex flex-col gap-4 relative overflow-hidden group">
+<div class="flex justify-between items-start z-10">
+<div class="flex flex-col">
+<h3 class="font-headline font-bold text-on-surface text-lg tracking-tight uppercase">Synth_Lead_Arp_3.wav</h3>
+<div class="flex items-center gap-4 mt-1">
+<span class="font-mono text-[10px] text-secondary-container">STATUS: CONFORMING</span>
+<span class="font-mono text-[10px] text-on-surface-variant">SIZE: 12.4 MB</span>
+</div>
+</div>
+<div class="text-right">
+<span class="font-mono text-2xl font-black text-secondary-container tracking-tighter">21%</span>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-4 items-center">
+<div class="col-span-12 bg-surface-container-lowest h-12 border border-outline-variant/20 relative overflow-hidden">
+<div class="absolute inset-0 flex items-center justify-around px-2 gap-[1px]">
+<div class="w-0.5 h-2 bg-secondary-container/30"></div>
+<div class="w-0.5 h-4 bg-secondary-container"></div>
+<div class="w-0.5 h-8 bg-secondary-container"></div>
+<div class="w-0.5 h-3 bg-secondary-container"></div>
+<div class="w-0.5 h-6 bg-secondary-container"></div>
+<div class="w-0.5 h-4 bg-secondary-container/40"></div>
+<div class="w-0.5 h-1 bg-secondary-container/10"></div>
+<div class="w-0.5 h-8 bg-secondary-container"></div>
+<div class="w-0.5 h-10 bg-secondary-container"></div>
+</div>
+<div class="absolute top-0 left-0 bottom-0 w-[21%] bg-secondary-container/10 border-r border-secondary-container"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Action Area -->
+<div class="mt-auto flex justify-between items-center bg-surface-container-lowest border-t-4 border-surface-container p-4">
+<div class="flex flex-col">
+<span class="font-mono text-[10px] text-secondary-container">ESTIMATED COMPLETION</span>
+<span class="font-mono text-lg text-on-surface uppercase font-bold">04:12 MINUTES</span>
+</div>
+<div class="flex gap-4">
+<button class="px-8 py-4 bg-surface-container-high text-on-surface-variant font-headline font-black uppercase tracking-widest hover:bg-surface-variant transition-colors active:scale-95">
+                        PAUSE QUEUE
+                    </button>
+<button class="px-12 py-4 bg-primary-container text-on-primary font-headline font-black uppercase tracking-widest hover:brightness-110 shadow-[0_0_20px_rgba(57,255,20,0.3)] transition-all active:scale-95">
+                        START BATCH PROCESS
+                    </button>
+</div>
+</div>
+<!-- HUD Overlay Element (Ambient Glow) -->
+<div class="absolute bottom-32 right-8 w-64 h-64 bg-secondary-container opacity-[0.03] blur-[80px] rounded-full pointer-events-none"></div>
+<!-- Scanline Texture Layer -->
+<div class="absolute inset-0 pointer-events-none scanline opacity-[0.15]"></div>
+</section>
+</main>
+<!-- UI Interaction Elements -->
+<div class="fixed bottom-4 right-6 flex items-center gap-4 z-50">
+<div class="flex items-center gap-2 bg-surface-container-lowest border border-outline-variant/40 px-3 py-1">
+<div class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></div>
+<span class="font-mono text-[10px] text-on-surface-variant">ENGINE_UPTIME: 14:02:55</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-lowest border border-outline-variant/40 px-3 py-1">
+<span class="font-mono text-[10px] text-on-surface-variant">TEMP: 42°C</span>
+</div>
+</div>
+</body></html>

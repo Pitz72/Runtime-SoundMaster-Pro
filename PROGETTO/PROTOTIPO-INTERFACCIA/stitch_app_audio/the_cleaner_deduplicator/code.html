@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SOUNDMASTER PRO - THE CLEANER</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#690005",
+              "on-primary-container": "#107100",
+              "on-error-container": "#ffdad6",
+              "surface-bright": "#393939",
+              "on-secondary-fixed": "#281800",
+              "secondary-fixed-dim": "#ffba3f",
+              "secondary-container": "#ffb211",
+              "inverse-on-surface": "#313030",
+              "tertiary-container": "#ffd3ce",
+              "on-surface": "#e5e2e1",
+              "on-primary": "#053900",
+              "surface-container": "#201f1f",
+              "tertiary-fixed": "#ffdad6",
+              "surface-container-high": "#2a2a2a",
+              "on-tertiary-fixed": "#410002",
+              "outline": "#85967c",
+              "on-secondary-container": "#6b4800",
+              "primary-container": "#39ff14",
+              "on-background": "#e5e2e1",
+              "surface-container-low": "#1c1b1b",
+              "surface-dim": "#131313",
+              "on-tertiary-container": "#c50015",
+              "primary-fixed-dim": "#2ae500",
+              "surface-tint": "#2ae500",
+              "outline-variant": "#3c4b35",
+              "surface-container-lowest": "#0e0e0e",
+              "error-container": "#93000a",
+              "on-secondary-fixed-variant": "#604100",
+              "on-surface-variant": "#baccb0",
+              "inverse-primary": "#106e00",
+              "on-secondary": "#432c00",
+              "inverse-surface": "#e5e2e1",
+              "on-primary-fixed-variant": "#095300",
+              "background": "#131313",
+              "on-tertiary-fixed-variant": "#93000c",
+              "error": "#ffb4ab",
+              "secondary": "#ffd79b",
+              "on-primary-fixed": "#022100",
+              "surface": "#131313",
+              "tertiary": "#fff8f7",
+              "secondary-fixed": "#ffdeae",
+              "tertiary-fixed-dim": "#ffb4ab",
+              "surface-variant": "#353534",
+              "primary": "#efffe3",
+              "on-tertiary": "#690006",
+              "primary-fixed": "#79ff5b",
+              "surface-container-highest": "#353534"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift {
+            background: linear-gradient(180deg, #131313 0%, #201F1F 100%);
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #0E0E0E; }
+        ::-webkit-scrollbar-thumb { background: #39FF14; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full flex flex-col bg-[#131313] dark:bg-[#131313] h-screen w-64 border-r-4 border-[#201F1F] z-50">
+<div class="p-6 flex flex-col gap-1">
+<span class="text-2xl font-black text-[#39FF14] tracking-widest font-['Space_Grotesk']">SOUNDMASTER PRO</span>
+<span class="font-['Space_Grotesk'] uppercase tracking-tighter text-xs text-on-surface-variant opacity-60">V.2.04-ALFA</span>
+</div>
+<nav class="flex-1 mt-8">
+<!-- The Hub (Inactive) -->
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 font-['Space_Grotesk'] uppercase tracking-tighter text-sm hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>The Hub</span>
+</a>
+<!-- The Cleaner (Active) -->
+<a class="flex items-center gap-4 bg-[#2A2A2A] text-[#39FF14] border-l-4 border-[#39FF14] px-6 py-4 font-['Space_Grotesk'] uppercase tracking-tighter text-sm" href="#">
+<span class="material-symbols-outlined" data-icon="cleaning_services">cleaning_services</span>
+<span>The Cleaner</span>
+</a>
+<!-- The Conformer (Inactive) -->
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 font-['Space_Grotesk'] uppercase tracking-tighter text-sm hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span>The Conformer</span>
+</a>
+<!-- The Librarian (Inactive) -->
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 font-['Space_Grotesk'] uppercase tracking-tighter text-sm hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="library_music">library_music</span>
+<span>The Librarian</span>
+</a>
+</nav>
+<div class="mt-auto p-6 flex flex-col gap-4">
+<button class="w-full py-3 bg-primary-container text-on-primary font-headline font-black text-xs tracking-widest hover:brightness-110 active:scale-95 transition-all">
+                SYNC LIBRARY
+            </button>
+<div class="flex flex-col border-t border-outline-variant/20 pt-4">
+<a class="flex items-center gap-4 text-[#BACCB0] py-2 opacity-70 font-['Space_Grotesk'] uppercase tracking-tighter text-xs hover:text-[#39FF14]" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-4 text-[#BACCB0] py-2 opacity-70 font-['Space_Grotesk'] uppercase tracking-tighter text-xs hover:text-[#39FF14]" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="help_center">help_center</span>
+<span>Support</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="flex justify-between items-center px-6 py-2 sticky top-0 z-40 ml-64 w-[calc(100%-16rem)] bg-[#201F1F] dark:bg-[#201F1F] h-12 border-b-2 border-[#0E0E0E]">
+<div class="flex items-center gap-8">
+<span class="font-['Space_Grotesk'] font-black text-[#39FF14] text-lg">RUNTIME SOUNDMASTER PRO</span>
+<div class="hidden md:flex items-center gap-6">
+<span class="font-['JetBrains_Mono'] text-[10px] font-bold uppercase text-[#39FF14] border-b border-[#39FF14]">System Status: OPTIMAL</span>
+<span class="font-['JetBrains_Mono'] text-[10px] font-bold uppercase text-[#BACCB0]">Library: /ROOT/AUDIO_ARCHIVE</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<button class="p-2 text-[#BACCB0] hover:text-[#39FF14] cursor-crosshair">
+<span class="material-symbols-outlined text-lg" data-icon="notifications">notifications</span>
+</button>
+<button class="p-2 text-[#BACCB0] hover:text-[#39FF14] cursor-crosshair">
+<span class="material-symbols-outlined text-lg" data-icon="terminal">terminal</span>
+</button>
+</div>
+<button class="px-4 py-1 border border-[#39FF14] text-[#39FF14] font-['JetBrains_Mono'] text-[10px] font-bold hover:bg-[#39FF14] hover:text-[#053900] transition-all">
+                EXPORT
+            </button>
+<div class="w-6 h-6 bg-surface-container-highest border border-outline-variant">
+<img alt="Admin" class="w-full h-full object-cover" data-alt="close-up profile avatar icon with a tech-noir green glow silhouette on a dark industrial background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwGku6MZc50Gvt3QtkoNWPxEOsQygNHeq55h0nkaRdVx2JksayAbxzU5xaYYU-2W567Po4kSRgbv3VDQ9dWd6d6XZrdOmzNQvMs76hnbbUuLWGjrdnagElh5jEKVzQQrjZ3bWF-6LvKEcuJ-YQTAuwdFoe6ZbK_0Q9fqR7JNRifK0KPCdelLDhrBScrdfO08uwVAIT-6g9gmb4J7xV409gvKNSK86_PkYx8X6UsQLkgXhTDJIc2URoMfbcwDrb03OHkgGkKljlU3dD"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 p-8 min-h-[calc(100vh-3rem)] bg-surface-dim">
+<!-- Scanning Progress Header -->
+<section class="mb-12 bg-surface-container p-6 border-l-4 border-secondary-container">
+<div class="flex justify-between items-end mb-4">
+<div>
+<h2 class="font-headline font-black text-2xl tracking-tight text-on-surface uppercase mb-1">Scanning /ROOT/AUDIO_ARCHIVE...</h2>
+<p class="font-mono text-xs text-on-surface-variant">ACOUSTIC FINGERPRINTING ENGINE: ACTIVE [44.1kHz ANALYSIS]</p>
+</div>
+<div class="text-right font-mono text-xl text-secondary-container">
+                    78%
+                </div>
+</div>
+<div class="w-full h-4 bg-surface-container-lowest relative overflow-hidden">
+<div class="absolute top-0 left-0 h-full bg-secondary-container w-[78%]"></div>
+<!-- Scanline effect -->
+<div class="absolute top-0 left-0 w-full h-full bg-[linear-gradient(90deg,transparent_0%,rgba(57,255,20,0.1)_50%,transparent_100%)] bg-[length:200%_100%] animate-pulse"></div>
+</div>
+<div class="mt-4 flex gap-4 overflow-hidden whitespace-nowrap opacity-40 font-mono text-[10px]">
+<span>ANALYZING: heavy_kick_v3.wav</span>
+<span class="text-primary-container">MATCH FOUND: drum_kit_01_kick.mp3</span>
+<span>ANALYZING: synth_lead_high.flac</span>
+<span>ANALYZING: vox_adlib_04.wav</span>
+</div>
+</section>
+<!-- Tool Actions -->
+<div class="flex justify-between items-center mb-8">
+<div>
+<h3 class="font-headline font-bold text-lg text-on-surface uppercase tracking-widest">Duplicate Sets Identified [14]</h3>
+<p class="text-xs text-on-surface-variant">Recommended action: Redundancy removal for 4.2GB recovery.</p>
+</div>
+<div class="flex gap-4">
+<button class="flex items-center gap-2 px-6 py-3 bg-primary-container text-on-primary font-headline font-black text-xs tracking-widest hover:shadow-[0_0_15px_rgba(57,255,20,0.4)] transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="auto_awesome">auto_awesome</span>
+                    AUTO-PICK GOLD
+                </button>
+<button class="flex items-center gap-2 px-6 py-3 bg-surface-container-high border border-outline-variant text-on-surface font-headline font-black text-xs tracking-widest hover:bg-surface-bright transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="archive">archive</span>
+                    MOVE TO SAFETY VAULT
+                </button>
+</div>
+</div>
+<!-- Duplicate Sets List -->
+<div class="space-y-10">
+<!-- Set 1 -->
+<div class="bg-surface-container-lowest border-t-2 border-primary-container/30">
+<div class="bg-surface-container-high px-4 py-2 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="font-mono text-[10px] text-on-primary-container bg-primary-container/20 px-2 py-0.5">SET #041</span>
+<span class="font-headline font-bold text-sm tracking-wide">SUB_BASS_D_MAJOR_90BPM</span>
+</div>
+<span class="font-mono text-[10px] text-on-surface-variant">MATCH CONFIDENCE: 99.8%</span>
+</div>
+<div class="p-0 overflow-x-auto">
+<table class="w-full text-left font-mono text-xs">
+<thead>
+<tr class="border-b border-outline-variant/10 text-on-surface-variant uppercase text-[10px]">
+<th class="p-4 font-normal">Rank</th>
+<th class="p-4 font-normal">File Name</th>
+<th class="p-4 font-normal">Format</th>
+<th class="p-4 font-normal">Bitrate</th>
+<th class="p-4 font-normal">Size</th>
+<th class="p-4 font-normal text-right">Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="bg-primary-container/5 border-b border-outline-variant/10">
+<td class="p-4">
+<span class="material-symbols-outlined text-primary-container" data-icon="stars" style="font-variation-settings: 'FILL' 1;">stars</span>
+</td>
+<td class="p-4 font-bold text-on-surface">sub_bass_d_maj_master.flac</td>
+<td class="p-4">FLAC</td>
+<td class="p-4 text-primary-container">Lossless</td>
+<td class="p-4">12.4 MB</td>
+<td class="p-4 text-right">
+<span class="text-primary-container font-black text-[10px] border border-primary-container px-2 py-1">KEEP (GOLD)</span>
+</td>
+</tr>
+<tr class="border-b border-outline-variant/10 opacity-60 hover:opacity-100 transition-opacity">
+<td class="p-4"><span class="material-symbols-outlined text-on-surface-variant" data-icon="content_copy">content_copy</span></td>
+<td class="p-4">sub_bass_90bpm_render.mp3</td>
+<td class="p-4">MP3</td>
+<td class="p-4">320 KBPS</td>
+<td class="p-4">3.1 MB</td>
+<td class="p-4 text-right">
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+<tr class="opacity-40 hover:opacity-100 transition-opacity">
+<td class="p-4"><span class="material-symbols-outlined text-on-surface-variant" data-icon="content_copy">content_copy</span></td>
+<td class="p-4">sub_bass_proxy_01.mp3</td>
+<td class="p-4">MP3</td>
+<td class="p-4 text-secondary-container">128 KBPS</td>
+<td class="p-4">1.2 MB</td>
+<td class="p-4 text-right">
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Set 2 -->
+<div class="bg-surface-container-lowest border-t-2 border-primary-container/30">
+<div class="bg-surface-container-high px-4 py-2 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="font-mono text-[10px] text-on-primary-container bg-primary-container/20 px-2 py-0.5">SET #042</span>
+<span class="font-headline font-bold text-sm tracking-wide">VOCAL_LEAD_DRY_V02</span>
+</div>
+<span class="font-mono text-[10px] text-on-surface-variant">MATCH CONFIDENCE: 84.2% (TRANSCODED)</span>
+</div>
+<div class="p-0 overflow-x-auto">
+<table class="w-full text-left font-mono text-xs">
+<thead>
+<tr class="border-b border-outline-variant/10 text-on-surface-variant uppercase text-[10px]">
+<th class="p-4 font-normal">Rank</th>
+<th class="p-4 font-normal">File Name</th>
+<th class="p-4 font-normal">Format</th>
+<th class="p-4 font-normal">Bitrate</th>
+<th class="p-4 font-normal">Size</th>
+<th class="p-4 font-normal text-right">Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="bg-primary-container/5 border-b border-outline-variant/10">
+<td class="p-4">
+<span class="material-symbols-outlined text-primary-container" data-icon="stars" style="font-variation-settings: 'FILL' 1;">stars</span>
+</td>
+<td class="p-4 font-bold text-on-surface">vocal_lead_dry_take4.wav</td>
+<td class="p-4">WAV</td>
+<td class="p-4 text-primary-container">24-BIT / 96kHz</td>
+<td class="p-4">48.2 MB</td>
+<td class="p-4 text-right">
+<span class="text-primary-container font-black text-[10px] border border-primary-container px-2 py-1">KEEP (GOLD)</span>
+</td>
+</tr>
+<tr class="opacity-60 hover:opacity-100 transition-opacity">
+<td class="p-4"><span class="material-symbols-outlined text-on-surface-variant" data-icon="content_copy">content_copy</span></td>
+<td class="p-4">vocal_lead_v02_alt.mp3</td>
+<td class="p-4">MP3</td>
+<td class="p-4">192 KBPS</td>
+<td class="p-4">4.2 MB</td>
+<td class="p-4 text-right">
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Set 3 -->
+<div class="bg-surface-container-lowest border-t-2 border-primary-container/30">
+<div class="bg-surface-container-high px-4 py-2 flex justify-between items-center">
+<div class="flex items-center gap-3">
+<span class="font-mono text-[10px] text-on-primary-container bg-primary-container/20 px-2 py-0.5">SET #043</span>
+<span class="font-headline font-bold text-sm tracking-wide">FIELD_REC_RAINSTORM_NY</span>
+</div>
+<span class="font-mono text-[10px] text-on-surface-variant">MATCH CONFIDENCE: 92.0%</span>
+</div>
+<div class="p-0 overflow-x-auto">
+<table class="w-full text-left font-mono text-xs">
+<thead>
+<tr class="border-b border-outline-variant/10 text-on-surface-variant uppercase text-[10px]">
+<th class="p-4 font-normal">Rank</th>
+<th class="p-4 font-normal">File Name</th>
+<th class="p-4 font-normal">Format</th>
+<th class="p-4 font-normal">Bitrate</th>
+<th class="p-4 font-normal">Size</th>
+<th class="p-4 font-normal text-right">Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="bg-primary-container/5 border-b border-outline-variant/10">
+<td class="p-4">
+<span class="material-symbols-outlined text-primary-container" data-icon="stars" style="font-variation-settings: 'FILL' 1;">stars</span>
+</td>
+<td class="p-4 font-bold text-on-surface">rainstorm_ny_6min.flac</td>
+<td class="p-4">FLAC</td>
+<td class="p-4 text-primary-container">Lossless</td>
+<td class="p-4">82.1 MB</td>
+<td class="p-4 text-right">
+<span class="text-primary-container font-black text-[10px] border border-primary-container px-2 py-1">KEEP (GOLD)</span>
+</td>
+</tr>
+<tr class="opacity-60 hover:opacity-100 transition-opacity">
+<td class="p-4"><span class="material-symbols-outlined text-on-surface-variant" data-icon="content_copy">content_copy</span></td>
+<td class="p-4">rainstorm_ny_edit.mp3</td>
+<td class="p-4">MP3</td>
+<td class="p-4">320 KBPS</td>
+<td class="p-4">15.5 MB</td>
+<td class="p-4 text-right">
+<button class="text-on-surface-variant hover:text-error transition-colors">
+<span class="material-symbols-outlined" data-icon="delete">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- System Logs / Asymmetric Footnote -->
+<footer class="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="col-span-2 bg-surface-container-low p-4 border border-outline-variant/10">
+<h4 class="font-headline font-bold text-xs uppercase text-on-surface-variant mb-2">Process Log Archive</h4>
+<div class="font-mono text-[9px] text-on-surface/50 h-24 overflow-y-auto space-y-1">
+<p>[14:22:01] Initializing Acoustic Fingerprinting Engine...</p>
+<p>[14:22:04] Thread 01: Scanning /ROOT/AUDIO_ARCHIVE/DRUMS</p>
+<p>[14:22:09] Thread 04: Found 3 potential matches for 'kick_01.wav'</p>
+<p>[14:22:12] Comparison: Spectral hash mismatch on 'hihat_01.mp3' (2.1% diff)</p>
+<p>[14:22:15] Optimization suggest: Auto-pick highest bitrate FLAC over MP3/320</p>
+<p>[14:22:18] Indexing metadata for 1,244 new entries...</p>
+</div>
+</div>
+<div class="bg-surface-container-highest p-4 flex flex-col justify-between">
+<div>
+<h4 class="font-headline font-black text-xs uppercase text-primary-container mb-1">Disk Health</h4>
+<p class="font-mono text-[10px] text-on-surface-variant uppercase">SSD_A: 92% OPTIMAL</p>
+</div>
+<div class="pt-4 border-t border-outline-variant/20">
+<div class="flex justify-between text-[10px] font-mono mb-1">
+<span>REDUNDANCY</span>
+<span>14.2%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-lowest">
+<div class="h-full bg-error w-[14.2%]"></div>
+</div>
+</div>
+</div>
+</footer>
+</main>
+<!-- Contextual FAB (Only for major actions) -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-secondary-container text-on-secondary shadow-[0_8px_24px_rgba(255,178,17,0.3)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50">
+<span class="material-symbols-outlined text-2xl" data-icon="bolt">bolt</span>
+</button>
+</body></html>

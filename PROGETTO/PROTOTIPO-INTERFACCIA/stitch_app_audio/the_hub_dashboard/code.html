@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#690005",
+              "on-primary-container": "#107100",
+              "on-error-container": "#ffdad6",
+              "surface-bright": "#393939",
+              "on-secondary-fixed": "#281800",
+              "secondary-fixed-dim": "#ffba3f",
+              "secondary-container": "#ffb211",
+              "inverse-on-surface": "#313030",
+              "tertiary-container": "#ffd3ce",
+              "on-surface": "#e5e2e1",
+              "on-primary": "#053900",
+              "surface-container": "#201f1f",
+              "tertiary-fixed": "#ffdad6",
+              "surface-container-high": "#2a2a2a",
+              "on-tertiary-fixed": "#410002",
+              "outline": "#85967c",
+              "on-secondary-container": "#6b4800",
+              "primary-container": "#39ff14",
+              "on-background": "#e5e2e1",
+              "surface-container-low": "#1c1b1b",
+              "surface-dim": "#131313",
+              "on-tertiary-container": "#c50015",
+              "primary-fixed-dim": "#2ae500",
+              "surface-tint": "#2ae500",
+              "outline-variant": "#3c4b35",
+              "surface-container-lowest": "#0e0e0e",
+              "error-container": "#93000a",
+              "on-secondary-fixed-variant": "#604100",
+              "on-surface-variant": "#baccb0",
+              "inverse-primary": "#106e00",
+              "on-secondary": "#432c00",
+              "inverse-surface": "#e5e2e1",
+              "on-primary-fixed-variant": "#095300",
+              "background": "#131313",
+              "on-tertiary-fixed-variant": "#93000c",
+              "error": "#ffb4ab",
+              "secondary": "#ffd79b",
+              "on-primary-fixed": "#022100",
+              "surface": "#131313",
+              "tertiary": "#fff8f7",
+              "secondary-fixed": "#ffdeae",
+              "tertiary-fixed-dim": "#ffb4ab",
+              "surface-variant": "#353534",
+              "primary": "#efffe3",
+              "on-tertiary": "#690006",
+              "primary-fixed": "#79ff5b",
+              "surface-container-highest": "#353534"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .tonal-shift {
+            background-image: linear-gradient(to right, #201F1F, #131313);
+        }
+        .cursor-crosshair { cursor: crosshair; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #131313; }
+        ::-webkit-scrollbar-thumb { background: #39FF14; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden">
+<!-- SIDE NAVIGATION BAR -->
+<aside class="fixed left-0 top-0 h-full flex flex-col bg-[#131313] dark:bg-[#131313] h-screen w-64 border-r-4 border-[#201F1F] z-50">
+<div class="p-6">
+<h1 class="text-2xl font-black text-[#39FF14] tracking-widest font-headline uppercase">SOUNDMASTER PRO</h1>
+<p class="font-['Space_Grotesk'] uppercase tracking-tighter text-xs text-on-surface-variant mt-1">V.2.04-ALFA</p>
+</div>
+<nav class="flex-1 mt-8 font-['Space_Grotesk'] uppercase tracking-tighter text-sm">
+<!-- Active Tab: The Hub -->
+<a class="flex items-center gap-4 bg-[#2A2A2A] text-[#39FF14] border-l-4 border-[#39FF14] px-6 py-4 hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>The Hub</span>
+</a>
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="cleaning_services">cleaning_services</span>
+<span>The Cleaner</span>
+</a>
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+<span>The Conformer</span>
+</a>
+<a class="flex items-center gap-4 text-[#BACCB0] px-6 py-4 opacity-70 hover:bg-[#201F1F] hover:text-[#EFFFE3] transition-colors duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="library_music">library_music</span>
+<span>The Librarian</span>
+</a>
+</nav>
+<div class="p-6 space-y-4">
+<button class="w-full bg-primary-container text-on-primary font-headline font-black py-3 px-4 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm" data-icon="sync">sync</span>
+                SYNC LIBRARY
+            </button>
+<div class="pt-4 border-t border-outline-variant/20 font-['Space_Grotesk'] uppercase tracking-tighter text-sm">
+<a class="flex items-center gap-4 text-[#BACCB0] py-2 opacity-70 hover:text-[#39FF14]" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+<a class="flex items-center gap-4 text-[#BACCB0] py-2 opacity-70 hover:text-[#39FF14]" href="#">
+<span class="material-symbols-outlined" data-icon="help_center">help_center</span>
+<span>Support</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- TOP NAVIGATION BAR -->
+<header class="flex justify-between items-center w-full px-6 py-2 sticky top-0 z-40 ml-64 w-[calc(100%-16rem)] bg-[#201F1F] dark:bg-[#201F1F] border-b-2 border-[#0E0E0E] h-12 font-['JetBrains_Mono'] text-xs font-bold uppercase">
+<div class="flex items-center gap-8">
+<span class="font-['Space_Grotesk'] font-black text-[#39FF14] text-lg">RUNTIME SOUNDMASTER PRO</span>
+<div class="hidden md:flex gap-6 items-center">
+<span class="text-[#39FF14] border-b border-[#39FF14]">System Status: OPTIMAL</span>
+<span class="text-[#BACCB0]">Library: /ROOT/AUDIO_ARCHIVE</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3">
+<button class="material-symbols-outlined text-[#BACCB0] hover:text-[#39FF14] cursor-crosshair" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-[#BACCB0] hover:text-[#39FF14] cursor-crosshair" data-icon="terminal">terminal</button>
+</div>
+<button class="bg-[#2A2A2A] text-[#39FF14] px-4 py-1 border border-[#39FF14]/30 hover:bg-[#39FF14] hover:text-[#053900] transition-colors active:scale-95 cursor-crosshair">
+                EXPORT
+            </button>
+<div class="w-6 h-6 bg-surface-container-highest border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-80" data-alt="Close-up portrait of professional audio engineer in dark studio environment with subtle green light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuChy6pJCI-ht_anD60-KC1R0DvlXLtGMvj3JMWSNlvQf7Y92UgsITj9-Sbp2B_K9T4BUIhaL2MGSYhwUW-4Bcpy_WkgtVpcUQ46vCwGwDMfz4r0i3KMWYn_q9p63kN3Ve7zaiKLWPBb61hkBqQlER38v-6Ml0Jt_N6JZhxsFxgWjwYJUZWVh6lcGMxB96NzKii9_pM_YrOU8ZhGm8Pz9WIaCmUkLmKNJc9OjQOGonQHdkKFX6cm4B5eABPAGyTTwaEToZJb-C85_HsC"/>
+</div>
+</div>
+</header>
+<!-- MAIN CONTENT CANVAS -->
+<main class="ml-64 p-8 h-[calc(100vh-3rem)] overflow-y-auto bg-surface-dim">
+<!-- BENTO DASHBOARD WIDGETS -->
+<div class="grid grid-cols-12 gap-6 mb-12">
+<!-- System Integrity Gauge -->
+<div class="col-span-12 md:col-span-4 bg-surface-container border-l-4 border-primary-container p-6 flex flex-col justify-between">
+<div>
+<h3 class="font-headline font-black text-on-surface-variant text-xs uppercase tracking-widest mb-4">System Integrity</h3>
+<div class="relative w-32 h-32 mx-auto">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-surface-container-highest" cx="64" cy="64" fill="transparent" r="58" stroke="currentColor" stroke-width="8"></circle>
+<circle class="text-primary-container" cx="64" cy="64" fill="transparent" r="58" stroke="currentColor" stroke-dasharray="364.4" stroke-dashoffset="36.4" stroke-width="8"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-mono text-2xl font-bold text-primary-container">90%</span>
+<span class="text-[8px] text-on-surface-variant">SECURE</span>
+</div>
+</div>
+</div>
+<div class="mt-6 font-mono text-[10px] text-on-surface-variant flex justify-between">
+<span>SECTOR_01: OK</span>
+<span>SECTOR_02: OK</span>
+</div>
+</div>
+<!-- Library Size -->
+<div class="col-span-12 md:col-span-4 bg-surface-container-high p-6 flex flex-col justify-between border-b-4 border-surface-container-lowest">
+<h3 class="font-headline font-black text-on-surface-variant text-xs uppercase tracking-widest mb-2">Library Size</h3>
+<div>
+<span class="font-mono text-5xl font-black text-primary-container leading-none">4.2</span>
+<span class="font-headline font-bold text-xl text-on-surface">TB</span>
+</div>
+<div class="mt-4 h-1 bg-surface-container-lowest w-full">
+<div class="h-full bg-primary-container w-[72%]"></div>
+</div>
+<p class="text-[10px] font-mono mt-2 text-on-surface-variant uppercase">Disk Availability: 1.2TB Remaining</p>
+</div>
+<!-- Status Cluster -->
+<div class="col-span-12 md:col-span-4 grid grid-rows-2 gap-4">
+<div class="bg-surface-container-highest p-4 flex items-center justify-between">
+<div>
+<h3 class="font-headline font-black text-on-surface-variant text-[10px] uppercase tracking-widest">Last Scrub</h3>
+<p class="font-mono text-lg text-on-surface">2023.10.24 // 14:02</p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="history">history</span>
+</div>
+<div class="bg-surface-container-lowest p-4 flex items-center justify-between border-2 border-primary-container/20">
+<div>
+<h3 class="font-headline font-black text-on-surface-variant text-[10px] uppercase tracking-widest">FFmpeg Status</h3>
+<p class="font-mono text-lg text-primary-container">ACTIVE</p>
+</div>
+<div class="w-3 h-3 bg-primary-container animate-pulse shadow-[0_0_10px_#39FF14]"></div>
+</div>
+</div>
+</div>
+<!-- MODULE GRID (MONOLITHIC CARDS) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+<!-- The Cleaner -->
+<div class="bg-surface-container group cursor-crosshair border border-transparent hover:border-primary-container/50 transition-all duration-300">
+<div class="h-48 relative overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-700" data-alt="Macro photo of dust particles illuminated by a sharp laser beam in a dark acoustic chamber" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBW0lRLNLa_y_hwWN_5RZRiYDsIRQUx0v5YU48xcYHo0p6E6NR17qejjyVub4JaWOaQF7luG5zc3H640zsakmtD8JelmZljc2shjXH8EHAOx03-nuYSrO3cy8N8H9Z2-aSTmymIM8E3YqO7PZEvtqJY_Wpa3Mw8zM47FQzXCY-6Daz8heeTT406tyxuQr1zkH-WSUE-4IVVZadmPMRpPrtGuilaR-o2a5p1yAVGiqgtMt5DHYQDI3Cgbl-KKJEESweN-qtUh_Ed95K9"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container to-transparent"></div>
+<div class="absolute bottom-4 left-6">
+<span class="material-symbols-outlined text-4xl text-primary-container" data-icon="cleaning_services">cleaning_services</span>
+</div>
+</div>
+<div class="p-6">
+<h2 class="font-headline font-black text-xl mb-2 text-primary">THE CLEANER</h2>
+<p class="text-sm text-on-surface-variant mb-6 leading-relaxed">Advanced spectral denoising and artifact removal system. Isolate and destroy non-harmonic transients.</p>
+<button class="w-full py-2 border border-outline-variant text-xs font-headline font-bold uppercase tracking-widest hover:bg-primary-container hover:text-on-primary transition-colors">INITIALIZE_MODULE</button>
+</div>
+</div>
+<!-- The Conformer -->
+<div class="bg-surface-container group cursor-crosshair border border-transparent hover:border-primary-container/50 transition-all duration-300">
+<div class="h-48 relative overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-700" data-alt="Geometric abstract pattern of steel beams and dark shadows representing architectural rigid structure" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKFdHgXlh9IxBLlMJJHL4rax1AT-MyP2_Eba9lWqEnA_K-WntvfOutVtSo-QNchHE4V9cU3YFQd8sviOJIBLyiZpeJXFBHXd0CcbF5WF6RrwZvFpPQhzhxOGGc-_esL5BOl8A644AdCpvTyGpEE4gSvbO1cnzCSiGsAuQluXEhTth-vOY0_63gP1vQryjhbREWeamWdxHTDruz70bbcgeL8sW7eHmZ9LMEUpCO5n6UhEs5-wtuU5FQ-sk5Gc4oASvCY-EzxyL3TDB4"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container to-transparent"></div>
+<div class="absolute bottom-4 left-6">
+<span class="material-symbols-outlined text-4xl text-primary-container" data-icon="settings_input_component">settings_input_component</span>
+</div>
+</div>
+<div class="p-6">
+<h2 class="font-headline font-black text-xl mb-2 text-primary">THE CONFORMER</h2>
+<p class="text-sm text-on-surface-variant mb-6 leading-relaxed">Loudness normalization (EBU R128) and sample rate conversion engine. Uniformity at scale.</p>
+<button class="w-full py-2 border border-outline-variant text-xs font-headline font-bold uppercase tracking-widest hover:bg-primary-container hover:text-on-primary transition-colors">INITIALIZE_MODULE</button>
+</div>
+</div>
+<!-- The Librarian -->
+<div class="bg-surface-container group cursor-crosshair border border-transparent hover:border-primary-container/50 transition-all duration-300">
+<div class="h-48 relative overflow-hidden">
+<img class="w-full h-full object-cover grayscale opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-700" data-alt="Perspective view of endless archive shelves in a brutalist concrete building with moody lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIN04XYh7wsgudcZXabugwnC0jUjzg3Lxhgzy5zRRgnag4Npj40rVO04o2jddAwNZzv6umQCQvY9LFFeuOsD-L_RJkELL2gj-ETpGtaXCWRczMkHNv90PJWuULETAX-TVFfZ4vV-9kK6EC-GzRdRfsjRf0ko3E8IDPxm0sDK4ErrrXgept3hPLzKW-3ZJ8eSVGQO8AvH7RgPNgIyRofn4fadfD9Dh-0N0eDqpeGZEy0v51xoietI46SxCRxV3ZUcRsBGItxVS_Y7bA"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container to-transparent"></div>
+<div class="absolute bottom-4 left-6">
+<span class="material-symbols-outlined text-4xl text-primary-container" data-icon="library_music">library_music</span>
+</div>
+</div>
+<div class="p-6">
+<h2 class="font-headline font-black text-xl mb-2 text-primary">THE LIBRARIAN</h2>
+<p class="text-sm text-on-surface-variant mb-6 leading-relaxed">Metadata injection, AI tagging, and structural organization for massive sonic archives.</p>
+<button class="w-full py-2 border border-outline-variant text-xs font-headline font-bold uppercase tracking-widest hover:bg-primary-container hover:text-on-primary transition-colors">INITIALIZE_MODULE</button>
+</div>
+</div>
+</div>
+<!-- RECENT ACTIVITY LOG -->
+<section class="bg-surface-container-lowest p-8 border-t border-outline-variant/10">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline font-black text-on-surface text-sm uppercase tracking-[0.2em]">RECENT_ACTIVITY_LOG</h3>
+<span class="font-mono text-[10px] text-on-surface-variant">STREAM_ACTIVE: 104.2 KB/S</span>
+</div>
+<div class="space-y-2 font-mono text-[11px]">
+<div class="flex items-center gap-4 py-2 border-b border-outline-variant/5 group hover:bg-surface-container transition-colors px-2">
+<span class="text-on-surface-variant">14:22:01</span>
+<span class="text-primary-container">[INFO]</span>
+<span class="text-on-surface">SCRUB_COMPLETE: 4,102 FILES PROCESSED IN /VOL_A/LIBRARY</span>
+<span class="ml-auto text-secondary-container">#0042</span>
+</div>
+<div class="flex items-center gap-4 py-2 border-b border-outline-variant/5 group hover:bg-surface-container transition-colors px-2">
+<span class="text-on-surface-variant">14:15:33</span>
+<span class="text-secondary-container">[WARN]</span>
+<span class="text-on-surface">CLIPPING_DETECTED: FILE 'THUMP_X8.WAV' EXCEEDED -0.1DBFS</span>
+<span class="ml-auto text-on-surface-variant">#0041</span>
+</div>
+<div class="flex items-center gap-4 py-2 border-b border-outline-variant/5 group hover:bg-surface-container transition-colors px-2">
+<span class="text-on-surface-variant">13:58:12</span>
+<span class="text-primary-container">[INFO]</span>
+<span class="text-on-surface">METADATA_INJECT: 'PROJECT_TITAN' TAGS APPLIED TO 128 ASSETS</span>
+<span class="ml-auto text-on-surface-variant">#0040</span>
+</div>
+<div class="flex items-center gap-4 py-2 border-b border-outline-variant/5 group hover:bg-surface-container transition-colors px-2">
+<span class="text-on-surface-variant">13:45:00</span>
+<span class="text-on-tertiary-container font-bold">[CRITICAL]</span>
+<span class="text-on-surface">SYNC_INTERRUPTED: TIMEOUT ON REMOTE SERVER /10.0.4.22</span>
+<span class="ml-auto text-on-tertiary-container">#0039</span>
+</div>
+<div class="flex items-center gap-4 py-2 group hover:bg-surface-container transition-colors px-2 opacity-60">
+<span class="text-on-surface-variant">13:02:11</span>
+<span class="text-primary-container">[INFO]</span>
+<span class="text-on-surface">USER_AUTH: ADMIN ACCESS GRANTED FROM TERMINAL_NODE_7</span>
+<span class="ml-auto text-on-surface-variant">#0038</span>
+</div>
+</div>
+</section>
+</main>
+<!-- FLOATING ACTION BUTTON (SUPPRESSED AS PER CONTEXTUAL RULES FOR DASHBOARD/THE HUB - RENDERING ONLY IF PRIMARY ACTION ALIGNS) -->
+<!-- The user requested "The Hub (Dashboard)" specifically. Since it's a dashboard, we provide a quick scan button. -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary-container text-on-primary flex items-center justify-center shadow-[0_0_20px_rgba(57,255,20,0.4)] active:scale-90 transition-transform z-50">
+<span class="material-symbols-outlined text-3xl" data-icon="search">search</span>
+</button>
+</body></html>
