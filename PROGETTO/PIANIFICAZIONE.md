@@ -246,10 +246,10 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 - [x] Integrazione FFmpeg (auto-detection + bundle)
 - [x] Integrazione fpcalc (bundle incluso)
 
-#### Fase 1 — Hub UI & Design System
-- [ ] Implementazione Design System "Brutalist Control Room"
-- [ ] Dashboard Hub centrale con navigazione a moduli
-- [ ] Sistema di notifiche/log live integrato
+#### Fase 1 — Hub UI & Design System ✅ _Completata: 2026-03-31 — v0.1.0_
+- [x] Implementazione Design System "Brutalist Control Room"
+- [x] Dashboard Hub centrale con navigazione a moduli (Framer Motion)
+- [x] Sistema di notifiche/log live integrato (Zustand + AnimatePresence)
 
 #### Fase 2 — The Cleaner (Modulo A)
 - [ ] `FileSystemService` (Rust): scansione ricorsiva chunked + scritto direttamente su SQLite
