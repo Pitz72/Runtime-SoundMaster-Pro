@@ -1,0 +1,124 @@
+/* ==========================================================================
+   Runtime SoundMaster Pro — Design System "The Brutalist Control Room"
+   Versione: 0.1.0-phase0
+   ========================================================================== */
+
+/* --- Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* --- Tailwind CSS 4 --- */
+@import "tailwindcss";
+
+/* ==========================================================================
+   DESIGN TOKENS — "Spectral Functionalism"
+   Ogni colore ha una "tensione" funzionale specifica (da DESIGN.md)
+   ========================================================================== */
+:root {
+  /* Superfici (Chassis industriale) */
+  --color-surface-dim:        #0D0D0D;   /* sfondo profondo */
+  --color-surface-chassis:    #131313;   /* chassis principale */
+  --color-surface-panel:      #1A1A1A;   /* pannelli modulo */
+  --color-surface-container:  #201F1F;   /* contenitori */
+  --color-surface-raised:     #2A2A2A;   /* elementi rialzati */
+
+  /* Accenti funzionali */
+  --color-primary:            #39FF14;   /* Verde Radioattivo — power on, attivo */
+  --color-primary-dim:        #22991D;   /* Verde smorzato — hover / disabled */
+  --color-amber:              #FFB211;   /* Ambra Alert — warning, highlight */
+  --color-amber-dim:          #A37208;   /* Ambra smorzata */
+  --color-danger:             #FF3131;   /* Rosso — errore, azione distruttiva */
+  --color-neutral:            #6B6B6B;   /* Neutro — elementi non attivi */
+
+  /* Testo */
+  --color-text-primary:       #E8E8E8;   /* testo principale */
+  --color-text-secondary:     #BACCB0;   /* label tecnici (testo su metallo inciso) */
+  --color-text-muted:         #5A5A5A;   /* placeholder, testo disabilitato */
+  --color-text-inverse:       #0D0D0D;   /* testo su accenti luminosi */
+
+  /* Tipografia */
+  --font-display:   'Space Grotesk', system-ui, sans-serif;    /* headlines UPPERCASE */
+  --font-data:      'JetBrains Mono', 'Courier New', monospace; /* dati tecnici, path, valori */
+  --font-body:      'Space Grotesk', system-ui, sans-serif;
+
+  /* Spaziature */
+  --spacing-unit:   4px;
+
+  /* Border radius: 0px ovunque — "no rounded corners" è identità del progetto */
+  --radius:         0px;
+
+  /* Effetti */
+  --glow-primary:   0 0 16px rgba(57, 255, 20, 0.35);    /* glow verde radioattivo */
+  --glow-amber:     0 0 24px rgba(255, 178, 17, 0.10);   /* Vacuum Tube — flyout/tooltip */
+  --glow-danger:    0 0 12px rgba(255, 49, 49, 0.30);
+
+  /* Transitions */
+  --transition-fast:   150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+/* ==========================================================================
+   RESET & BASE
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--color-surface-chassis);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Disabilita selezione testo involontaria (tipico delle app desktop) */
+  user-select: none;
+}
+
+/* Abilita selezione testo nei campi di input e aree di testo */
+input, textarea, [contenteditable] {
+  user-select: text;
+}
+
+/* ==========================================================================
+   TIPOGRAFIA
+   ========================================================================== */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.font-data {
+  font-family: var(--font-data);
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   SCROLLBAR CUSTOM (Brutalist)
+   ========================================================================== */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-chassis);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neutral);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}

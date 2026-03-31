@@ -239,12 +239,12 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 
 ### 📅 8. Roadmap di Sviluppo
 
-#### Fase 0 — Setup Ambiente
-- [ ] Inizializzazione progetto Tauri (Rust + React 19 + TS + Tailwind 4)
-- [ ] Configurazione build pipeline (Windows target principale, macOS/Linux secondari)
-- [ ] Setup SQLite (`rusqlite`) con schema iniziale + WAL mode
-- [ ] Integrazione FFmpeg (auto-detection + bundle)
-- [ ] Integrazione fpcalc (bundle incluso)
+#### Fase 0 — Setup Ambiente ✅ _Completata: 2026-03-31 — v0.0.1_
+- [x] Inizializzazione progetto Tauri (Rust + React 19 + TS + Tailwind 4)
+- [x] Configurazione build pipeline (Windows target principale, macOS/Linux secondari)
+- [x] Setup SQLite (`rusqlite`) con schema iniziale + WAL mode
+- [x] Integrazione FFmpeg (auto-detection + bundle)
+- [x] Integrazione fpcalc (bundle incluso)
 
 #### Fase 1 — Hub UI & Design System
 - [ ] Implementazione Design System "Brutalist Control Room"
