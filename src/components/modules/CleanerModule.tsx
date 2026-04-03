@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -32,14 +32,6 @@ function formatDuration(secs: number | null): string {
   const m = Math.floor(secs / 60);
   const s = Math.floor(secs % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function deriveFfprobePath(ffmpegPath: string | null): string | null {
-  if (!ffmpegPath) return null;
-  const isWin = ffmpegPath.toLowerCase().endsWith('.exe');
-  const lastSlash = Math.max(ffmpegPath.lastIndexOf('/'), ffmpegPath.lastIndexOf('\\'));
-  const dir = lastSlash >= 0 ? ffmpegPath.slice(0, lastSlash + 1) : '';
-  return dir + (isWin ? 'ffprobe.exe' : 'ffprobe');
 }
 
 // ── Badge ragione non-conform ──────────────────────────────────────────────
@@ -143,7 +135,7 @@ export function CleanerModule() {
   const [keepOverrides, setKeepOverrides] = useState<Record<string, number>>({});
   const [dupResolveResult, setDupResolveResult] = useState<DuplicateResolveResult | null>(null);
 
-  const ffprobePath = useMemo(() => deriveFfprobePath(systemStatus.ffmpegPath), [systemStatus.ffmpegPath]);
+  const ffprobePath = systemStatus.ffprobePath;
   const fpcalcPath = systemStatus.fpcalcPath;
 
   // Path destinazione effettivi
@@ -173,6 +165,7 @@ export function CleanerModule() {
         );
         const stats = await invoke('get_library_stats');
         setLibraryStats(stats as any);
+        setIsScanning(false);
       }
     } catch (err) {
       setIsScanning(false);
@@ -496,9 +489,9 @@ export function CleanerModule() {
                       Switch to <span className="text-industrial-cyan font-bold">DUPLICATES</span> mode to detect acoustic and binary duplicates.
                     </p>
                   )}
-                  {!isCleanerRunning && !systemStatus.ffmpegFound && (
+                  {!isCleanerRunning && !systemStatus.ffprobeFound && (
                     <p className="max-w-md text-industrial-amber/80 text-[10px] mb-4 font-mono border border-industrial-amber/20 px-4 py-2">
-                      FFmpeg not found — video stream &amp; corrupt checks skipped. Pattern matching only.
+                      FFprobe not found — video stream &amp; corrupt checks skipped. Pattern matching only.
                     </p>
                   )}
                   {isCleanerRunning && cleanerProgress && (

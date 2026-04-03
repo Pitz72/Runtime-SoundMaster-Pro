@@ -5,6 +5,7 @@ mod cleaner;
 mod db;
 mod duplicates;
 mod ffmpeg;
+mod ffprobe;
 mod fpcalc;
 mod scanner;
 
@@ -27,6 +28,7 @@ pub fn run() {
             db::db_status,
             db::get_library_stats,
             ffmpeg::detect_ffmpeg_cmd,
+            ffprobe::detect_ffprobe_cmd,
             fpcalc::detect_fpcalc_cmd,
             scanner::scan_workspace,
             cleaner::detect_non_conform,

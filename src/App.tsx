@@ -19,6 +19,13 @@ interface TauriFfmpegInfo {
   source: string | null;
 }
 
+interface TauriFfprobeInfo {
+  found: boolean;
+  path: string | null;
+  version: string | null;
+  source: string | null;
+}
+
 interface TauriFpcalcInfo {
   found: boolean;
   path: string | null;
@@ -48,9 +55,10 @@ export default function App() {
     const init = async () => {
       addLog("info", "System initialization in progress...");
       try {
-        const [db, ffmpeg, fpcalc] = await Promise.all([
+        const [db, ffmpeg, ffprobe, fpcalc] = await Promise.all([
           invoke<string>("db_status"),
           invoke<TauriFfmpegInfo>("detect_ffmpeg_cmd"),
+          invoke<TauriFfprobeInfo>("detect_ffprobe_cmd"),
           invoke<TauriFpcalcInfo>("detect_fpcalc_cmd"),
         ]);
 
@@ -60,6 +68,10 @@ export default function App() {
           ffmpegPath: ffmpeg.path,
           ffmpegVersion: ffmpeg.version,
           ffmpegSource: ffmpeg.source,
+          ffprobeFound: ffprobe.found,
+          ffprobePath: ffprobe.path,
+          ffprobeVersion: ffprobe.version,
+          ffprobeSource: ffprobe.source,
           fpcalcFound: fpcalc.found,
           fpcalcPath: fpcalc.path,
           fpcalcVersion: fpcalc.version,
@@ -71,6 +83,14 @@ export default function App() {
         if (ffmpeg.found)
           addLog("success", `FFmpeg [${ffmpeg.source}]`, ffmpeg.version ?? undefined);
         else addLog("error", "FFmpeg not detected. Required for The Conformer.");
+
+        if (ffprobe.found)
+          addLog("success", `FFprobe [${ffprobe.source}]`, ffprobe.version ?? undefined);
+        else
+          addLog(
+            "warning",
+            "FFprobe not detected. Video-stream & corrupt checks will be skipped."
+          );
 
         if (fpcalc.found)
           addLog("success", `fpcalc [${fpcalc.source}]`, fpcalc.version ?? undefined);

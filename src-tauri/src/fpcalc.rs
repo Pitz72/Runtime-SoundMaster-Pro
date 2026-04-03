@@ -37,13 +37,21 @@ fn probe_fpcalc(path: &PathBuf) -> Option<String> {
     }
 }
 
-fn bundled_path(resource_dir: &PathBuf) -> PathBuf {
+fn bundled_path(resource_dir: &PathBuf) -> Option<PathBuf> {
     let name = if cfg!(target_os = "windows") {
         format!("fpcalc-{}.exe", TARGET)
     } else {
         format!("fpcalc-{}", TARGET)
     };
-    resource_dir.join(name)
+    let dev_path = resource_dir.join("binaries").join(&name);
+    if dev_path.exists() {
+        return Some(dev_path);
+    }
+    let prod_path = resource_dir.join(&name);
+    if prod_path.exists() {
+        return Some(prod_path);
+    }
+    None
 }
 
 pub fn detect_fpcalc(app: &tauri::AppHandle) -> FpcalcInfo {
@@ -51,8 +59,7 @@ pub fn detect_fpcalc(app: &tauri::AppHandle) -> FpcalcInfo {
 
     // --- 1. Sidecar bundled ---
     if let Ok(resource_dir) = app.path().resource_dir() {
-        let bundled = bundled_path(&resource_dir);
-        if bundled.exists() {
+        if let Some(bundled) = bundled_path(&resource_dir) {
             if let Some(version) = probe_fpcalc(&bundled) {
                 return FpcalcInfo {
                     found: true,

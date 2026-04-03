@@ -130,6 +130,10 @@ export interface SystemStatus {
   ffmpegPath: string | null;
   ffmpegVersion: string | null;
   ffmpegSource: string | null;
+  ffprobeFound: boolean;
+  ffprobePath: string | null;
+  ffprobeVersion: string | null;
+  ffprobeSource: string | null;
   fpcalcFound: boolean;
   fpcalcPath: string | null;
   fpcalcVersion: string | null;
@@ -283,6 +287,10 @@ export const useAppStore = create<AppState>((set) => ({
     ffmpegPath: null,
     ffmpegVersion: null,
     ffmpegSource: null,
+    ffprobeFound: false,
+    ffprobePath: null,
+    ffprobeVersion: null,
+    ffprobeSource: null,
     fpcalcFound: false,
     fpcalcPath: null,
     fpcalcVersion: null,

@@ -1,6 +1,6 @@
 [package]
 name = "runtime-soundmaster-pro"
-version = "0.5.1"
+version = "0.5.3"
 description = "Runtime SoundMaster Pro — Universal Radio Library Sanitizer"
 authors = ["Simone Pizzi — Runtime Radio"]
 edition = "2021"

@@ -239,40 +239,59 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 
 ### 📅 8. Roadmap di Sviluppo
 
+> **Aggiornamento al 2026-04-04 — v0.5.3**: Le fasi 0, 1 e 2 sono completate. Vedere `docs/CHANGELOG.md` per il dettaglio di ogni versione rilasciata.
+
 #### Fase 0 — Setup Ambiente ✅ _Completata: 2026-03-31 — v0.0.1_
+
 - [x] Inizializzazione progetto Tauri (Rust + React 19 + TS + Tailwind 4)
 - [x] Configurazione build pipeline (Windows target principale, macOS/Linux secondari)
 - [x] Setup SQLite (`rusqlite`) con schema iniziale + WAL mode
 - [x] Integrazione FFmpeg (auto-detection + bundle)
 - [x] Integrazione fpcalc (bundle incluso)
 
-#### Fase 1 — Hub UI & Design System ✅ _Completata: 2026-03-31 — v0.1.0_
-- [x] Implementazione Design System "Brutalist Control Room"
+#### Fase 1 — Hub UI & Design System ✅ _Completata: 2026-04-03 — v0.2.0_
+
+> Nota: il design system "Brutalist Control Room" (verde `#39FF14`) è stato sostituito in v0.2.0 da "Industrial" (ambra `#FFB300` + ciano `#A4E7FF`). Il documento `PROTOTIPO-INTERFACCIA/signal_kombinat/DESIGN.md` è un riferimento storico.
+
+- [x] Implementazione Design System "Industrial" (ambra/ciano su carbone scuro)
 - [x] Dashboard Hub centrale con navigazione a moduli (Framer Motion)
 - [x] Sistema di notifiche/log live integrato (Zustand + AnimatePresence)
+- [x] Scansione workspace ricorsiva con progress streaming real-time (`scanner.rs`)
+- [x] Statistiche libreria live dall'Hub (SQLite → React)
 
-#### Fase 2 — The Cleaner (Modulo A)
-- [ ] `FileSystemService` (Rust): scansione ricorsiva chunked + scritto direttamente su SQLite
-- [ ] `FingerprintService` (Rust): integrazione fpcalc + AcoustID
-- [ ] `AnalysisOrchestrator` (Rust): pipeline duplicati (impronta → metadati → versioni)
-- [ ] `QualityPicker` (Rust): algoritmo best-pick con criteri configurabili
-- [ ] Review UI React: Master-Detail + Cover Art streaming + Toggle-Override
+#### Fase 2 — The Cleaner (Modulo A) ✅ _Completata: 2026-04-03 — v0.5.3_
 
-#### Fase 3 — The Conformer (Modulo B)
-- [ ] `ConformerService` (Rust): pipeline FFmpeg con tutti i preset
-- [ ] `LoudnormService` (Rust): EBU R128 via FFmpeg loudnorm (2-pass)
-- [ ] `SilenceTrimService` (Rust): rilevamento e taglio silenzi
-- [ ] UI preset selector + opzioni avanzate
+- [x] `scanner.rs`: scansione ricorsiva chunked + DB-First (INSERT OR IGNORE)
+- [x] `cleaner.rs`: 17 pattern regex YouTube + FFprobe video stream + corrupt detection
+- [x] `ffprobe.rs`: detection dedicata bundled/PATH/common (separata da FFmpeg)
+- [x] Quarantena non-distruttiva `_NonConform/` con collision-safe naming
+- [x] `duplicates.rs`: SHA-256 binary hash + metadata fuzzy + acoustic fingerprinting (fpcalc)
+- [x] Best-pick algorithm: lossless > bitrate > durata > dimensione
+- [x] Quarantena duplicati `_Duplicates/` con override manuale per gruppo
+- [x] FFmpeg 8.1 + FFprobe 8.1 + fpcalc 1.6.0 bundled attivi
+- [x] CleanerModule: mode switcher NON-CONFORM / DUPLICATES, UI completa wired
 
-#### Fase 4 — The Librarian (Modulo C)
-- [ ] `MetadataService` (Rust/lofty-rs): read/write tag + cover art
-- [ ] `ArtworkService` (Rust): estrazione, resize, injection massiva
-- [ ] `CatalogService` (Rust): SQLite FTS5, ricerca full-text
-- [ ] UI catalogo con preview cover art, ricerca, filtri
+#### Fase 3 — The Conformer (Modulo B) — _In sviluppo: v0.6.0+_
+
+- [ ] `conformer.rs` (Rust): pipeline FFmpeg con preset (PODCAST / RADIO_STD / RADIO_HQ / MASTER / LOSSLESS_NORM)
+- [ ] Loudness normalization EBU R128 via FFmpeg `loudnorm` (2-pass)
+- [ ] Silent trimming (`silencedetect` + trim)
+- [ ] Worker concorrenti con kill reale (lezione phantom processes da RAMP)
+- [ ] Progress streaming via eventi Tauri
+- [ ] ConformerModule: collegamento UI preset selector + file queue + progress per-file
+
+#### Fase 4 — The Librarian (Modulo C) — _Pianificata: v0.7.0+_
+
+- [ ] `metadata.rs` (Rust/lofty-rs): read/write tag ID3/FLAC/M4A
+- [ ] `artwork.rs` (Rust): estrazione, resize (max 500×500px JPEG), injection massiva
+- [ ] `catalog.rs` (Rust): SQLite FTS5 full-text search
+- [ ] LibrarianModule: catalogo reale con preview cover art, ricerca, filtri
 
 #### Fase 5 — Polish & Build
-- [ ] Test su librerie reali (>10.000 brani)
-- [ ] Ottimizzazione performance (profiling Rust)
+
+- [ ] Test su librerie reali (>50.000 brani) e ottimizzazione performance (profiling Rust)
+- [ ] Virtual List obbligatoria per risultati massivi (lezione 5000 img = crash GPU da RAMP)
+- [ ] Cover Art streaming via protocollo custom (lezione base64 IPC lag da RAMP)
 - [ ] Build installer Windows (NSIS/MSI via Tauri)
 - [ ] Documentazione utente
 
