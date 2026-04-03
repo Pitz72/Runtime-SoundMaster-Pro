@@ -3099,12 +3099,13 @@ dependencies = [
 
 [[package]]
 name = "runtime-soundmaster-pro"
-version = "0.4.1"
+version = "0.5.1"
 dependencies = [
  "regex",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

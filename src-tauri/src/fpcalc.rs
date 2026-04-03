@@ -1,17 +1,18 @@
 /// fpcalc.rs — Rilevamento fpcalc (Chromaprint)
-/// Runtime SoundMaster Pro — v0.1.0
+/// Runtime SoundMaster Pro — v0.5.1
 ///
-/// fpcalc è il tool CLI di Chromaprint per generare acoustic fingerprint.
-/// Utilizzato da The Cleaner per il rilevamento duplicati sonori.
-///
-/// Strategia analoga a ffmpeg.rs:
-/// 1. Bundled (src-tauri/binaries/)
+/// Strategia di ricerca (in ordine di priorità):
+/// 1. Sidecar bundled nella resource dir Tauri
+///    → src-tauri/binaries/fpcalc-<target-triple>[.exe]
 /// 2. PATH di sistema
 /// 3. Percorsi comuni per OS
 
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
+use tauri::Manager;
+
+const TARGET: &str = env!("TARGET");
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FpcalcInfo {
@@ -21,40 +22,45 @@ pub struct FpcalcInfo {
     pub source: Option<String>,
 }
 
-/// Verifica che fpcalc al path indicato risponda correttamente.
 fn probe_fpcalc(path: &PathBuf) -> Option<String> {
-    let output = Command::new(path)
-        .arg("-version")
-        .output()
-        .ok()?;
-
+    let output = Command::new(path).arg("-version").output().ok()?;
     if output.status.success() {
-        let version_line = String::from_utf8_lossy(&output.stdout)
+        let line = String::from_utf8_lossy(&output.stdout)
             .lines()
             .next()
             .unwrap_or("unknown")
             .trim()
             .to_string();
-        Some(version_line)
+        Some(line)
     } else {
         None
     }
 }
 
-/// Cerca fpcalc nell'ordine di priorità.
-pub fn detect_fpcalc() -> FpcalcInfo {
+fn bundled_path(resource_dir: &PathBuf) -> PathBuf {
+    let name = if cfg!(target_os = "windows") {
+        format!("fpcalc-{}.exe", TARGET)
+    } else {
+        format!("fpcalc-{}", TARGET)
+    };
+    resource_dir.join(name)
+}
+
+pub fn detect_fpcalc(app: &tauri::AppHandle) -> FpcalcInfo {
     let exe_name = if cfg!(target_os = "windows") { "fpcalc.exe" } else { "fpcalc" };
 
-    // --- 1. Bundled ---
-    let bundled = PathBuf::from("binaries").join(exe_name);
-    if bundled.exists() {
-        if let Some(version) = probe_fpcalc(&bundled) {
-            return FpcalcInfo {
-                found: true,
-                path: Some(bundled.to_string_lossy().to_string()),
-                version: Some(version),
-                source: Some("bundled".to_string()),
-            };
+    // --- 1. Sidecar bundled ---
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let bundled = bundled_path(&resource_dir);
+        if bundled.exists() {
+            if let Some(version) = probe_fpcalc(&bundled) {
+                return FpcalcInfo {
+                    found: true,
+                    path: Some(bundled.to_string_lossy().to_string()),
+                    version: Some(version),
+                    source: Some("bundled".to_string()),
+                };
+            }
         }
     }
 
@@ -62,17 +68,20 @@ pub fn detect_fpcalc() -> FpcalcInfo {
     let system_path = PathBuf::from(exe_name);
     if let Some(version) = probe_fpcalc(&system_path) {
         let full_path = if cfg!(target_os = "windows") {
-            Command::new("where").arg("fpcalc").output()
+            Command::new("where")
+                .arg("fpcalc")
+                .output()
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
                 .map(|s| s.lines().next().unwrap_or("fpcalc").trim().to_string())
         } else {
-            Command::new("which").arg("fpcalc").output()
+            Command::new("which")
+                .arg("fpcalc")
+                .output()
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
                 .map(|s| s.trim().to_string())
         };
-
         return FpcalcInfo {
             found: true,
             path: full_path,
@@ -84,11 +93,11 @@ pub fn detect_fpcalc() -> FpcalcInfo {
     // --- 3. Percorsi comuni Windows ---
     #[cfg(target_os = "windows")]
     {
-        let paths = vec![
+        let common = vec![
             PathBuf::from(r"C:\Program Files\Chromaprint\fpcalc.exe"),
             PathBuf::from(r"C:\chromaprint\fpcalc.exe"),
         ];
-        for path in &paths {
+        for path in &common {
             if path.exists() {
                 if let Some(version) = probe_fpcalc(path) {
                     return FpcalcInfo {
@@ -105,11 +114,11 @@ pub fn detect_fpcalc() -> FpcalcInfo {
     // --- 4. Percorsi comuni macOS ---
     #[cfg(target_os = "macos")]
     {
-        let paths = vec![
+        let common = vec![
             PathBuf::from("/opt/homebrew/bin/fpcalc"),
             PathBuf::from("/usr/local/bin/fpcalc"),
         ];
-        for path in &paths {
+        for path in &common {
             if path.exists() {
                 if let Some(version) = probe_fpcalc(path) {
                     return FpcalcInfo {
@@ -126,11 +135,11 @@ pub fn detect_fpcalc() -> FpcalcInfo {
     // --- 5. Percorsi comuni Linux ---
     #[cfg(target_os = "linux")]
     {
-        let paths = vec![
+        let common = vec![
             PathBuf::from("/usr/bin/fpcalc"),
             PathBuf::from("/usr/local/bin/fpcalc"),
         ];
-        for path in &paths {
+        for path in &common {
             if path.exists() {
                 if let Some(version) = probe_fpcalc(path) {
                     return FpcalcInfo {
@@ -144,7 +153,6 @@ pub fn detect_fpcalc() -> FpcalcInfo {
         }
     }
 
-    // Non trovato
     FpcalcInfo {
         found: false,
         path: None,
@@ -153,8 +161,7 @@ pub fn detect_fpcalc() -> FpcalcInfo {
     }
 }
 
-/// Comando Tauri: rileva fpcalc e restituisce info al frontend.
 #[tauri::command]
-pub fn detect_fpcalc_cmd() -> FpcalcInfo {
-    detect_fpcalc()
+pub fn detect_fpcalc_cmd(app: tauri::AppHandle) -> FpcalcInfo {
+    detect_fpcalc(&app)
 }

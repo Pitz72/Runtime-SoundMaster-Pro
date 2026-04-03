@@ -3,6 +3,7 @@
 
 mod cleaner;
 mod db;
+mod duplicates;
 mod ffmpeg;
 mod fpcalc;
 mod scanner;
@@ -30,6 +31,8 @@ pub fn run() {
             scanner::scan_workspace,
             cleaner::detect_non_conform,
             cleaner::quarantine_non_conform,
+            duplicates::detect_duplicates,
+            duplicates::resolve_duplicates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

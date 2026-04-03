@@ -1,6 +1,6 @@
 [package]
 name = "runtime-soundmaster-pro"
-version = "0.4.1"
+version = "0.5.1"
 description = "Runtime SoundMaster Pro — Universal Radio Library Sanitizer"
 authors = ["Simone Pizzi — Runtime Radio"]
 edition = "2021"
@@ -32,4 +32,6 @@ tokio = { version = "1", features = ["full"] }
 walkdir = "2"
 # Pattern matching per rilevamento file YouTube/non-conform
 regex = "1"
+# Hashing SHA-256 per rilevamento duplicati binari esatti
+sha2 = "0.10"
 

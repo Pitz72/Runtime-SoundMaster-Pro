@@ -1,16 +1,22 @@
 /// ffmpeg.rs — Rilevamento e validazione FFmpeg
-/// Runtime SoundMaster Pro — v0.1.0
+/// Runtime SoundMaster Pro — v0.5.1
 ///
 /// Strategia di ricerca (in ordine di priorità):
-/// 1. Binario bundled in src-tauri/binaries/ (rilascio produzione)
-/// 2. PATH di sistema (utenti con FFmpeg già installato)
-/// 3. Percorsi comuni Windows (WinGet, Chocolatey, percorsi standard)
+/// 1. Sidecar bundled nella resource dir Tauri
+///    → src-tauri/binaries/ffmpeg-<target-triple>[.exe]
+///    → a runtime: <resource_dir>/ffmpeg-<target-triple>[.exe]
+/// 2. PATH di sistema
+/// 3. Percorsi comuni Windows (WinGet, Chocolatey, standard)
 /// 4. Percorsi comuni macOS (Homebrew, MacPorts)
-/// 5. Percorsi comuni Linux (/usr/bin, /usr/local/bin)
+/// 5. Percorsi comuni Linux
 
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
+use tauri::Manager;
+
+// Target triple iniettato da build.rs (es. "x86_64-pc-windows-msvc")
+const TARGET: &str = env!("TARGET");
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FfmpegInfo {
@@ -20,43 +26,38 @@ pub struct FfmpegInfo {
     pub source: Option<String>, // "bundled" | "system_path" | "common_path"
 }
 
-/// Verifica che un eseguibile FFmpeg al path indicato risponda correttamente.
-/// Chiama `ffmpeg -version` e controlla l'exit code.
+/// Verifica che l'eseguibile FFmpeg al path indicato risponda correttamente.
 fn probe_ffmpeg(path: &PathBuf) -> Option<String> {
-    let output = Command::new(path)
-        .arg("-version")
-        .output()
-        .ok()?;
-
+    let output = Command::new(path).arg("-version").output().ok()?;
     if output.status.success() {
-        // Estrae la prima riga dell'output (es. "ffmpeg version 7.1 Copyright...")
-        let version_line = String::from_utf8_lossy(&output.stdout)
+        let line = String::from_utf8_lossy(&output.stdout)
             .lines()
             .next()
             .unwrap_or("unknown")
             .to_string();
-        Some(version_line)
+        Some(line)
     } else {
         None
     }
 }
 
-/// Cerca FFmpeg nell'ordine di priorità documentato.
-pub fn detect_ffmpeg() -> FfmpegInfo {
-    // --- 1. Binario bundled (produzione) ---
-    // In Tauri 2.x i binari external sono in src-tauri/binaries/
-    // A runtime, Tauri li copia nella resource dir dell'app.
-    // Per ora verifichiamo il path relativo durante lo sviluppo.
-    let bundled_names = if cfg!(target_os = "windows") {
-        vec!["ffmpeg.exe"]
+/// Costruisce il path del sidecar nella resource dir Tauri.
+/// Nome file: `ffmpeg-<TARGET>[.exe]`
+fn bundled_path(resource_dir: &PathBuf) -> PathBuf {
+    let name = if cfg!(target_os = "windows") {
+        format!("ffmpeg-{}.exe", TARGET)
     } else {
-        vec!["ffmpeg"]
+        format!("ffmpeg-{}", TARGET)
     };
+    resource_dir.join(name)
+}
 
-    for name in &bundled_names {
-        // Tauri resource dir (runtime) — usabile solo con AppHandle in produzione
-        // In Fase 0 è sufficiente documentare la posizione attesa
-        let bundled = PathBuf::from("binaries").join(name);
+/// Cerca FFmpeg nell'ordine di priorità documentato.
+/// Richiede AppHandle per risolvere la resource dir Tauri.
+pub fn detect_ffmpeg(app: &tauri::AppHandle) -> FfmpegInfo {
+    // --- 1. Sidecar bundled (resource dir Tauri) ---
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let bundled = bundled_path(&resource_dir);
         if bundled.exists() {
             if let Some(version) = probe_ffmpeg(&bundled) {
                 return FfmpegInfo {
@@ -70,22 +71,28 @@ pub fn detect_ffmpeg() -> FfmpegInfo {
     }
 
     // --- 2. PATH di sistema ---
-    let system_name = if cfg!(target_os = "windows") { "ffmpeg.exe" } else { "ffmpeg" };
+    let system_name = if cfg!(target_os = "windows") {
+        "ffmpeg.exe"
+    } else {
+        "ffmpeg"
+    };
     let system_path = PathBuf::from(system_name);
     if let Some(version) = probe_ffmpeg(&system_path) {
-        // Recupera il path completo tramite 'where' (Windows) o 'which' (Unix)
         let full_path = if cfg!(target_os = "windows") {
-            Command::new("where").arg("ffmpeg").output()
+            Command::new("where")
+                .arg("ffmpeg")
+                .output()
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
                 .map(|s| s.lines().next().unwrap_or("ffmpeg").trim().to_string())
         } else {
-            Command::new("which").arg("ffmpeg").output()
+            Command::new("which")
+                .arg("ffmpeg")
+                .output()
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
                 .map(|s| s.trim().to_string())
         };
-
         return FfmpegInfo {
             found: true,
             path: full_path,
@@ -97,16 +104,14 @@ pub fn detect_ffmpeg() -> FfmpegInfo {
     // --- 3. Percorsi comuni Windows ---
     #[cfg(target_os = "windows")]
     {
-        let common_windows_paths = vec![
+        let common = vec![
             PathBuf::from(r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"),
             PathBuf::from(r"C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe"),
             PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"),
-            // WinGet install path
             PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default())
                 .join(r"Microsoft\WinGet\Links\ffmpeg.exe"),
         ];
-
-        for path in &common_windows_paths {
+        for path in &common {
             if path.exists() {
                 if let Some(version) = probe_ffmpeg(path) {
                     return FfmpegInfo {
@@ -123,13 +128,12 @@ pub fn detect_ffmpeg() -> FfmpegInfo {
     // --- 4. Percorsi comuni macOS ---
     #[cfg(target_os = "macos")]
     {
-        let common_macos_paths = vec![
-            PathBuf::from("/opt/homebrew/bin/ffmpeg"),      // Homebrew Apple Silicon
-            PathBuf::from("/usr/local/bin/ffmpeg"),          // Homebrew Intel / MacPorts
-            PathBuf::from("/opt/local/bin/ffmpeg"),          // MacPorts
+        let common = vec![
+            PathBuf::from("/opt/homebrew/bin/ffmpeg"),
+            PathBuf::from("/usr/local/bin/ffmpeg"),
+            PathBuf::from("/opt/local/bin/ffmpeg"),
         ];
-
-        for path in &common_macos_paths {
+        for path in &common {
             if path.exists() {
                 if let Some(version) = probe_ffmpeg(path) {
                     return FfmpegInfo {
@@ -146,13 +150,12 @@ pub fn detect_ffmpeg() -> FfmpegInfo {
     // --- 5. Percorsi comuni Linux ---
     #[cfg(target_os = "linux")]
     {
-        let common_linux_paths = vec![
+        let common = vec![
             PathBuf::from("/usr/bin/ffmpeg"),
             PathBuf::from("/usr/local/bin/ffmpeg"),
             PathBuf::from("/snap/bin/ffmpeg"),
         ];
-
-        for path in &common_linux_paths {
+        for path in &common {
             if path.exists() {
                 if let Some(version) = probe_ffmpeg(path) {
                     return FfmpegInfo {
@@ -166,7 +169,6 @@ pub fn detect_ffmpeg() -> FfmpegInfo {
         }
     }
 
-    // Non trovato
     FfmpegInfo {
         found: false,
         path: None,
@@ -175,9 +177,7 @@ pub fn detect_ffmpeg() -> FfmpegInfo {
     }
 }
 
-/// Comando Tauri: rileva FFmpeg e restituisce info al frontend.
-/// Utilizzato dall'Hub UI per mostrare lo stato del motore audio.
 #[tauri::command]
-pub fn detect_ffmpeg_cmd() -> FfmpegInfo {
-    detect_ffmpeg()
+pub fn detect_ffmpeg_cmd(app: tauri::AppHandle) -> FfmpegInfo {
+    detect_ffmpeg(&app)
 }

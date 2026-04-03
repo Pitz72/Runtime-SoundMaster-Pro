@@ -316,6 +316,7 @@ fn quarantine_non_conform_impl(
     app: tauri::AppHandle,
     workspace_path: String,
     track_ids: Vec<i64>,
+    quarantine_path: Option<String>,
 ) -> Result<QuarantineResult, String> {
     let data_dir = app
         .path()
@@ -326,9 +327,13 @@ fn quarantine_non_conform_impl(
         .map_err(|e| format!("Cannot open DB: {e}"))?;
 
     // Crea la cartella di quarantena (non-distruttivo: mai eliminare)
-    let quarantine_dir = Path::new(&workspace_path).join("_NonConform");
+    // Se l'utente ha specificato un path custom, usa quello; altrimenti <workspace>/_NonConform
+    let quarantine_dir = match quarantine_path {
+        Some(ref p) => std::path::PathBuf::from(p),
+        None => Path::new(&workspace_path).join("_NonConform"),
+    };
     std::fs::create_dir_all(&quarantine_dir)
-        .map_err(|e| format!("Cannot create _NonConform dir: {e}"))?;
+        .map_err(|e| format!("Cannot create quarantine dir: {e}"))?;
 
     let mut moved = 0u64;
     let mut failed = 0u64;
@@ -425,17 +430,19 @@ pub async fn detect_non_conform(
         .map_err(|e| format!("Task join error: {e}"))?
 }
 
-/// Sposta i file identificati come non-conformi in `<workspace>/_NonConform/`.
-/// Aggiorna `conforming_status = 'non_conform'` nel DB per ogni file spostato.
+/// Sposta i file identificati come non-conformi nella cartella di quarantena.
+/// Default: `<workspace_path>/_NonConform/`.
+/// Se `quarantine_path` è fornito, usa quel percorso direttamente.
 /// Operazione non-distruttiva: i file vengono spostati, mai eliminati.
 #[tauri::command]
 pub async fn quarantine_non_conform(
     app: tauri::AppHandle,
     workspace_path: String,
     track_ids: Vec<i64>,
+    quarantine_path: Option<String>,
 ) -> Result<QuarantineResult, String> {
     tokio::task::spawn_blocking(move || {
-        quarantine_non_conform_impl(app, workspace_path, track_ids)
+        quarantine_non_conform_impl(app, workspace_path, track_ids, quarantine_path)
     })
     .await
     .map_err(|e| format!("Task join error: {e}"))?

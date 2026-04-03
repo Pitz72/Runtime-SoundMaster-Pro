@@ -81,6 +81,49 @@ export interface QuarantineResult {
   failed: number;
 }
 
+// ── Tipi duplicates.rs ────────────────────────────────────────────────────
+
+export interface DuplicateFile {
+  id: number;
+  path: string;
+  filename: string;
+  artist: string | null;
+  title: string | null;
+  bitrate: number | null;
+  duration_secs: number | null;
+  file_size_bytes: number;
+  format: string | null;
+  is_best_pick: boolean;
+}
+
+export interface DuplicateGroup {
+  group_id: string;
+  /** "binary_hash" | "metadata" | "acoustic" */
+  match_type: string;
+  score: number;
+  files: DuplicateFile[];
+  best_pick_id: number;
+}
+
+export interface DuplicateProgress {
+  phase: 'binary' | 'metadata' | 'acoustic' | 'complete' | 'error';
+  processed: number;
+  total: number;
+  current_file: string;
+  groups_found: number;
+}
+
+export interface DuplicateDetectResult {
+  total_processed: number;
+  groups_found: number;
+  groups: DuplicateGroup[];
+}
+
+export interface DuplicateResolveResult {
+  moved: number;
+  failed: number;
+}
+
 export interface SystemStatus {
   db: string | null;
   ffmpegFound: boolean;
@@ -88,6 +131,7 @@ export interface SystemStatus {
   ffmpegVersion: string | null;
   ffmpegSource: string | null;
   fpcalcFound: boolean;
+  fpcalcPath: string | null;
   fpcalcVersion: string | null;
   fpcalcSource: string | null;
   initialized: boolean;
@@ -125,6 +169,14 @@ interface AppState {
   setCleanerProgress: (progress: CleanerProgress | null) => void;
   nonConformItems: NonConformItem[];
   setNonConformItems: (items: NonConformItem[]) => void;
+
+  // Stato The Cleaner — duplicate detection
+  isDuplicateRunning: boolean;
+  setIsDuplicateRunning: (running: boolean) => void;
+  duplicateProgress: DuplicateProgress | null;
+  setDuplicateProgress: (progress: DuplicateProgress | null) => void;
+  duplicateGroups: DuplicateGroup[];
+  setDuplicateGroups: (groups: DuplicateGroup[]) => void;
 
   // Log
   logs: LogEntry[];
@@ -216,6 +268,14 @@ export const useAppStore = create<AppState>((set) => ({
   nonConformItems: [],
   setNonConformItems: (items) => set({ nonConformItems: items }),
 
+  // Duplicati
+  isDuplicateRunning: false,
+  setIsDuplicateRunning: (running) => set({ isDuplicateRunning: running }),
+  duplicateProgress: null,
+  setDuplicateProgress: (progress) => set({ duplicateProgress: progress }),
+  duplicateGroups: [],
+  setDuplicateGroups: (groups) => set({ duplicateGroups: groups }),
+
   // Sistema
   systemStatus: {
     db: null,
@@ -224,6 +284,7 @@ export const useAppStore = create<AppState>((set) => ({
     ffmpegVersion: null,
     ffmpegSource: null,
     fpcalcFound: false,
+    fpcalcPath: null,
     fpcalcVersion: null,
     fpcalcSource: null,
     initialized: false,
