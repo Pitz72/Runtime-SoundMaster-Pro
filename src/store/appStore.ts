@@ -13,7 +13,7 @@ import { create } from "zustand";
 
 // --- Tipi ---
 
-export type ModuleId = "hub" | "cleaner" | "conformer" | "librarian";
+export type ModuleId = "hub" | "cleaner" | "conformer" | "librarian" | "settings";
 
 export type LogType = "info" | "success" | "warning" | "error";
 
@@ -23,6 +23,29 @@ export interface LogEntry {
   type: LogType;
   message: string;
   detail?: string;
+}
+
+// Corrisponde a db::LibraryStats nel backend Rust
+export interface LibraryStats {
+  total_tracks: number;
+  non_conform: number;
+  duplicates: number;
+  to_verify: number;
+}
+
+// Corrisponde a scanner::ScanResult nel backend Rust
+export interface ScanResult {
+  scan_id: number;
+  total_files: number;
+  duration_secs: number;
+}
+
+// Corrisponde a scanner::ScanProgress nel backend Rust
+export interface ScanProgress {
+  scanned: number;
+  total: number;
+  current_file: string;
+  phase: 'discovering' | 'indexing' | 'complete' | 'error';
 }
 
 export interface SystemStatus {
@@ -50,6 +73,16 @@ interface AppState {
   // Stato sistema
   systemStatus: SystemStatus;
   setSystemStatus: (status: Partial<SystemStatus>) => void;
+
+  // Statistiche libreria (popolate da get_library_stats dopo scan)
+  libraryStats: LibraryStats | null;
+  setLibraryStats: (stats: LibraryStats) => void;
+
+  // Stato scansione workspace
+  isScanning: boolean;
+  setIsScanning: (scanning: boolean) => void;
+  scanProgress: ScanProgress | null;
+  setScanProgress: (progress: ScanProgress | null) => void;
 
   // Log
   logs: LogEntry[];
@@ -91,6 +124,7 @@ export const useAppStore = create<AppState>((set) => ({
         cleaner: "MOD-A: The Cleaner",
         conformer: "MOD-B: The Conformer",
         librarian: "MOD-C: The Librarian",
+        settings: "Settings",
       };
       const entry: LogEntry = {
         id: newLogId(),
@@ -121,6 +155,16 @@ export const useAppStore = create<AppState>((set) => ({
         logs: [...state.logs, entry].slice(-200),
       };
     }),
+
+  // Statistiche libreria
+  libraryStats: null,
+  setLibraryStats: (stats) => set({ libraryStats: stats }),
+
+  // Scansione
+  isScanning: false,
+  setIsScanning: (scanning) => set({ isScanning: scanning }),
+  scanProgress: null,
+  setScanProgress: (progress) => set({ scanProgress: progress }),
 
   // Sistema
   systemStatus: {

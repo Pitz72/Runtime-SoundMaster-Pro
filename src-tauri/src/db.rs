@@ -7,6 +7,7 @@
 /// - Path: <app_data_dir>/runtime-soundmaster-pro/library.db
 
 use rusqlite::{Connection, Result as SqlResult};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -111,6 +112,63 @@ pub fn init_database(app_data_dir: &PathBuf) -> SqlResult<Connection> {
     conn.execute_batch(INIT_SQL)?;
 
     Ok(conn)
+}
+
+/// Statistiche aggregate della libreria — esposte all'Hub UI.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LibraryStats {
+    pub total_tracks: i64,
+    pub non_conform: i64,  // conforming_status = 'non_conform'
+    pub duplicates: i64,   // conforming_status = 'duplicate'
+    pub to_verify: i64,    // conforming_status = 'to_verify'
+}
+
+/// Comando Tauri: restituisce le statistiche aggregate della libreria.
+/// Apre una connessione read-only — sicuro con WAL mode.
+#[tauri::command]
+pub fn get_library_stats(app: tauri::AppHandle) -> Result<LibraryStats, String> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
+
+    let conn = Connection::open(data_dir.join("library.db"))
+        .map_err(|e| format!("Cannot open DB: {e}"))?;
+
+    let total: i64 = conn
+        .query_row("SELECT COUNT(*) FROM tracks", [], |r| r.get(0))
+        .unwrap_or(0);
+
+    let non_conform: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM tracks WHERE conforming_status='non_conform'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let duplicates: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM tracks WHERE conforming_status='duplicate'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    let to_verify: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM tracks WHERE conforming_status='to_verify'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+
+    Ok(LibraryStats {
+        total_tracks: total,
+        non_conform,
+        duplicates,
+        to_verify,
+    })
 }
 
 /// Comand Tauri: verifica che il DB sia inizializzato e restituisce il path.

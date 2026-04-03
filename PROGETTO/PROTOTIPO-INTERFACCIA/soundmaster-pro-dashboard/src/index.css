@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;900&family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
-
 @import "tailwindcss";
 
 @theme {
@@ -19,25 +17,8 @@
 }
 
 @layer base {
-  *, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  html, body, #root {
-    height: 100%;
-    width: 100%;
-  }
-
   body {
-    @apply bg-industrial-bg text-industrial-text antialiased;
-    font-family: var(--font-display);
-    user-select: none;
-  }
-
-  input, textarea, [contenteditable] {
-    user-select: text;
+    @apply bg-industrial-bg text-industrial-text font-display antialiased;
   }
 }
 
@@ -47,9 +28,6 @@
   }
   .glow-amber-strong {
     box-shadow: 0 0 30px rgba(255, 179, 0, 0.3);
-  }
-  .glow-cyan {
-    box-shadow: 0 0 20px rgba(164, 231, 255, 0.15);
   }
   .recessed-well {
     box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.5);
@@ -62,8 +40,5 @@
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-industrial-border;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-industrial-amber;
   }
 }

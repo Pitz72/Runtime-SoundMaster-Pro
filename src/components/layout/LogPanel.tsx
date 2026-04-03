@@ -1,86 +1,64 @@
-/**
- * LogPanel.tsx
- * Runtime SoundMaster Pro v0.1.0
- * 
- * Pannello console a comparsa dal basso per visualizzare i log di sistema.
- */
+import { useRef, useEffect } from 'react';
+import { useAppStore } from '../../store/appStore';
+import type { LogType } from '../../store/appStore';
 
-import { useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useAppStore } from "../../store/appStore";
+const TYPE_LABEL: Record<LogType, string> = {
+  info:    '[INFO]',
+  success: '[SYNC]',
+  warning: '[WARN]',
+  error:   '[ERRO]',
+};
+
+const TYPE_CLASS: Record<LogType, string> = {
+  info:    'text-industrial-cyan',
+  success: 'text-industrial-cyan',
+  warning: 'text-industrial-amber',
+  error:   'text-industrial-red',
+};
 
 export function LogPanel() {
-  const { logs, logPanelOpen, toggleLogPanel } = useAppStore();
+  const { logs } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll all'ultimo log solo quando il pannello è aperto
+  // Auto-scroll al fondo quando arrivano nuovi log
   useEffect(() => {
-    if (logPanelOpen && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [logs, logPanelOpen]);
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs]);
 
   return (
-    <AnimatePresence>
-      {logPanelOpen && (
-        <motion.div
-          initial={{ y: "100%", opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: "100%", opacity: 0 }}
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          className="absolute bottom-0 left-0 right-0 z-40 flex flex-col"
-          style={{
-            height: "40vh",
-            background: "#0A0A0A",
-            borderTop: "1px solid #2A2A2A",
-            boxShadow: "0 -10px 30px rgba(0,0,0,0.5)",
-          }}
-        >
-          {/* Header del pannello log */}
-          <div className="flex items-center justify-between px-4 py-2 shrink-0 bg-[#131313] border-b border-[#1A1A1A]">
-            <span className="font-data text-[10px] uppercase tracking-widest text-[#BACCB0]">
-              System Log
+    <section className="bg-black p-6 border border-industrial-border">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[10px] font-mono font-bold text-industrial-text-dim tracking-widest uppercase flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-industrial-cyan" />
+          Mission Log
+        </h3>
+        <span className="text-[9px] font-mono text-industrial-text-dim/30 uppercase tracking-tighter">
+          Kernel v2.0.4-LTS
+        </span>
+      </div>
+
+      <div className="space-y-px h-48 overflow-y-auto pr-2 custom-scrollbar recessed-well bg-industrial-bg/30 p-2">
+        {logs.map((log) => (
+          <div
+            key={log.id}
+            className="flex gap-4 p-2 bg-industrial-bg/50 border-l-2 border-transparent hover:border-industrial-cyan hover:bg-industrial-panel transition-all group"
+          >
+            <span className="text-industrial-text-dim/50 font-mono text-[10px] shrink-0">
+              {log.timestamp}
             </span>
-            <button
-              onClick={toggleLogPanel}
-              className="text-[#6B6B6B] hover:text-[#E8E8E8] transition-colors"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square"/>
-              </svg>
-            </button>
+            <span className={`font-mono text-[10px] font-bold shrink-0 ${TYPE_CLASS[log.type]}`}>
+              {TYPE_LABEL[log.type]}
+            </span>
+            <span className="text-industrial-text-dim font-mono text-[10px] group-hover:text-industrial-text">
+              {log.message}
+              {log.detail && (
+                <span className="text-industrial-text-dim/50 ml-2">— {log.detail}</span>
+              )}
+            </span>
           </div>
-
-          {/* Area contenuto log */}
-          <div className="flex-1 overflow-y-auto p-4 font-data text-[11px] leading-relaxed">
-            {logs.length === 0 ? (
-              <div className="text-[#6B6B6B] italic">Nessun log disponibile...</div>
-            ) : (
-              logs.map((log) => {
-                let color = "#BACCB0"; // info
-                if (log.type === "success") color = "#39FF14";
-                else if (log.type === "warning") color = "#FFB211";
-                else if (log.type === "error") color = "#FF3131";
-
-                return (
-                  <div key={log.id} className="mb-1 flex gap-3 hover:bg-[#131313] px-1 py-0.5 -mx-1 transition-colors">
-                    <span className="text-[#6B6B6B] shrink-0">[{log.timestamp}]</span>
-                    <div className="flex flex-col">
-                      <span style={{ color }}>{log.message}</span>
-                      {log.detail && (
-                        <span className="text-[#6B6B6B] ml-2 mt-0.5 border-l border-[#2A2A2A] pl-2">
-                          {log.detail}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={bottomRef} />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+    </section>
   );
 }
