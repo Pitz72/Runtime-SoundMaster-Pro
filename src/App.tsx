@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence } from "framer-motion";
 
 import { useAppStore } from "./store/appStore";
-import type { LibraryStats, ScanProgress } from "./store/appStore";
+import type { LibraryStats, ScanProgress, CleanerProgress } from "./store/appStore";
 import { MainLayout } from "./components/layout/MainLayout";
 import { HubModule } from "./components/modules/HubModule";
 import { CleanerModule } from "./components/modules/CleanerModule";
@@ -35,6 +35,8 @@ export default function App() {
     setLibraryStats,
     setScanProgress,
     setIsScanning,
+    setIsCleanerRunning,
+    setCleanerProgress,
   } = useAppStore();
 
   // ── Inizializzazione Tauri ─────────────────────────────────────────────────
@@ -53,6 +55,7 @@ export default function App() {
         setSystemStatus({
           db,
           ffmpegFound: ffmpeg.found,
+          ffmpegPath: ffmpeg.path,
           ffmpegVersion: ffmpeg.version,
           ffmpegSource: ffmpeg.source,
           fpcalcFound: fpcalc.found,
@@ -127,6 +130,33 @@ export default function App() {
       unlisten?.();
     };
   }, [addLog, setLibraryStats, setScanProgress, setIsScanning]);
+
+  // ── Listener globale eventi cleaner-progress ──────────────────────────────
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+
+    listen<CleanerProgress>("cleaner-progress", (event) => {
+      const payload = event.payload;
+      setCleanerProgress(payload);
+
+      if (payload.phase === "complete") {
+        setIsCleanerRunning(false);
+        // cleanerProgress viene azzerato da CleanerModule dopo aver letto il risultato
+      }
+
+      if (payload.phase === "error") {
+        setIsCleanerRunning(false);
+        setCleanerProgress(null);
+        addLog("error", "Cleaner analysis failed");
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [addLog, setIsCleanerRunning, setCleanerProgress]);
 
   return (
     <MainLayout>

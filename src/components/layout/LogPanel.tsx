@@ -20,9 +20,12 @@ export function LogPanel() {
   const { logs } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll al fondo quando arrivano nuovi log
+  // Auto-scroll al fondo del log interno quando arrivano nuovi messaggi.
+  // block: 'nearest' evita che scrollIntoView propaghi lo scroll al <main>
+  // esterno — senza questo, ogni addLog() durante l'init portava la viewport
+  // in fondo alla pagina invece che in cima.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [logs]);
 
   return (

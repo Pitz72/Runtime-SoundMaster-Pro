@@ -3099,8 +3099,9 @@ dependencies = [
 
 [[package]]
 name = "runtime-soundmaster-pro"
-version = "0.3.0"
+version = "0.4.1"
 dependencies = [
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

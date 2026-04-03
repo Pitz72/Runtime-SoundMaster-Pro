@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import { LayoutGrid, Eraser, Settings2, Library, Settings } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import type { ModuleId } from '../../store/appStore';
@@ -33,6 +34,14 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { currentModule, setModule, systemStatus } = useAppStore();
+  const mainRef = useRef<HTMLElement>(null);
+
+  // Scroll al top del contenuto ad ogni cambio di modulo.
+  // Necessario perché <main> è il container scrollabile: senza questo reset
+  // la posizione di scroll del modulo precedente persiste nel nuovo.
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [currentModule]);
 
   const navItems: { id: ModuleId; icon: React.ElementType; label: string }[] = [
     { id: 'hub',       icon: LayoutGrid, label: 'Hub'       },
@@ -90,7 +99,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         <TopBar />
 
-        <main className="p-8 pb-16 space-y-8 h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
+        <main ref={mainRef} className="p-8 pb-16 space-y-8 h-[calc(100vh-80px)] overflow-y-auto custom-scrollbar">
           {children}
           <LogPanel />
         </main>

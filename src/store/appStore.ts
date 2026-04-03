@@ -48,9 +48,43 @@ export interface ScanProgress {
   phase: 'discovering' | 'indexing' | 'complete' | 'error';
 }
 
+// Corrisponde a cleaner::NonConformItem nel backend Rust
+export interface NonConformItem {
+  id: number;
+  path: string;
+  filename: string;
+  /** "youtube_pattern" | "video_stream" | "corrupt" */
+  reason: string;
+  reason_detail: string;
+  file_size_bytes: number;
+}
+
+// Corrisponde a cleaner::CleanerProgress nel backend Rust
+export interface CleanerProgress {
+  analyzed: number;
+  total: number;
+  current_file: string;
+  phase: 'analyzing' | 'complete' | 'error';
+  found: number;
+}
+
+// Corrisponde a cleaner::CleanerResult nel backend Rust
+export interface CleanerResult {
+  total_analyzed: number;
+  non_conform_found: number;
+  items: NonConformItem[];
+}
+
+// Corrisponde a cleaner::QuarantineResult nel backend Rust
+export interface QuarantineResult {
+  moved: number;
+  failed: number;
+}
+
 export interface SystemStatus {
   db: string | null;
   ffmpegFound: boolean;
+  ffmpegPath: string | null;
   ffmpegVersion: string | null;
   ffmpegSource: string | null;
   fpcalcFound: boolean;
@@ -83,6 +117,14 @@ interface AppState {
   setIsScanning: (scanning: boolean) => void;
   scanProgress: ScanProgress | null;
   setScanProgress: (progress: ScanProgress | null) => void;
+
+  // Stato The Cleaner — non-conform detection
+  isCleanerRunning: boolean;
+  setIsCleanerRunning: (running: boolean) => void;
+  cleanerProgress: CleanerProgress | null;
+  setCleanerProgress: (progress: CleanerProgress | null) => void;
+  nonConformItems: NonConformItem[];
+  setNonConformItems: (items: NonConformItem[]) => void;
 
   // Log
   logs: LogEntry[];
@@ -166,10 +208,19 @@ export const useAppStore = create<AppState>((set) => ({
   scanProgress: null,
   setScanProgress: (progress) => set({ scanProgress: progress }),
 
+  // Cleaner
+  isCleanerRunning: false,
+  setIsCleanerRunning: (running) => set({ isCleanerRunning: running }),
+  cleanerProgress: null,
+  setCleanerProgress: (progress) => set({ cleanerProgress: progress }),
+  nonConformItems: [],
+  setNonConformItems: (items) => set({ nonConformItems: items }),
+
   // Sistema
   systemStatus: {
     db: null,
     ffmpegFound: false,
+    ffmpegPath: null,
     ffmpegVersion: null,
     ffmpegSource: null,
     fpcalcFound: false,

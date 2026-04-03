@@ -1,6 +1,7 @@
 /// lib.rs — Entry point Tauri
-/// Runtime SoundMaster Pro — v0.3.0
+/// Runtime SoundMaster Pro — v0.4.1
 
+mod cleaner;
 mod db;
 mod ffmpeg;
 mod fpcalc;
@@ -27,6 +28,8 @@ pub fn run() {
             ffmpeg::detect_ffmpeg_cmd,
             fpcalc::detect_fpcalc_cmd,
             scanner::scan_workspace,
+            cleaner::detect_non_conform,
+            cleaner::quarantine_non_conform,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
