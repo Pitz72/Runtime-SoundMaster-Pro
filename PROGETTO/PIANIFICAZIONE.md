@@ -239,7 +239,7 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 
 ### 📅 8. Roadmap di Sviluppo
 
-> **Aggiornamento al 2026-04-04 — v0.5.3**: Le fasi 0, 1 e 2 sono completate. Vedere `docs/CHANGELOG.md` per il dettaglio di ogni versione rilasciata.
+> **Aggiornamento al 2026-04-04 — v0.5.10**: Le fasi 0, 1 e 2 sono completate con ciclo esteso di fix post-test reale. Vedere `docs/CHANGELOG.md` per il dettaglio di ogni versione rilasciata.
 
 #### Fase 0 — Setup Ambiente ✅ _Completata: 2026-03-31 — v0.0.1_
 
@@ -259,7 +259,9 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 - [x] Scansione workspace ricorsiva con progress streaming real-time (`scanner.rs`)
 - [x] Statistiche libreria live dall'Hub (SQLite → React)
 
-#### Fase 2 — The Cleaner (Modulo A) ✅ _Completata: 2026-04-03 — v0.5.3_
+#### Fase 2 — The Cleaner (Modulo A) ✅ *Completata con ciclo fix: 2026-04-04 — v0.5.10*
+
+##### Core (v0.4.0 → v0.5.3)
 
 - [x] `scanner.rs`: scansione ricorsiva chunked + DB-First (INSERT OR IGNORE)
 - [x] `cleaner.rs`: 17 pattern regex YouTube + FFprobe video stream + corrupt detection
@@ -270,6 +272,29 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 - [x] Quarantena duplicati `_Duplicates/` con override manuale per gruppo
 - [x] FFmpeg 8.1 + FFprobe 8.1 + fpcalc 1.6.0 bundled attivi
 - [x] CleanerModule: mode switcher NON-CONFORM / DUPLICATES, UI completa wired
+
+##### Ciclo fix post-test reale su libreria di produzione (v0.5.4 → v0.5.10)
+
+- [x] Fix falsi positivi corrupt: `duration == None` ≠ file corrotto (v0.5.4)
+- [x] Fix loop duplicati: file già in `_Duplicates/` esclusi da query detect (v0.5.4)
+- [x] Fix falsi positivi YouTube ID: validazione charset misto richiesta (v0.5.4)
+- [x] Fix type safety: `invoke<LibraryStats>` tipato, rimossi cast `as any` (v0.5.5)
+- [x] Fix RAM scanner: two-pass O(1) — conta senza accumulare PathBuf (v0.5.5)
+- [x] Fix parsing FFprobe: `serde_json` + struct `#[derive(Deserialize)]` (v0.5.5)
+- [x] Fix cross-platform path separator: rilevato dinamicamente da workspace path (v0.5.6)
+- [x] `utils.rs`: `collision_safe_path` estratta in modulo condiviso (v0.5.6)
+- [x] `COMPILED_PATTERNS`: `OnceLock<Vec<Regex>>` — compilati una volta sola (v0.5.6)
+- [x] Fix fpcalc duration: salvata in DB quando assente, migliora best-pick (v0.5.6)
+- [x] `logger.rs`: log persistente per sessione in `%APPDATA%` con timestamp (v0.5.7)
+- [x] Scan isolation: reset `conforming_status='unknown'` prima di ogni nuova scansione (v0.5.7)
+- [x] Esclusione cartelle quarantena da WalkDir (v0.5.7)
+- [x] Fix critico: 98% falsi positivi `video_stream` — `FfprobeDisposition.attached_pic` distingue cover art da video reali (v0.5.8)
+- [x] UX: progress bar scansione workspace visibile in CleanerModule Step 1 (v0.5.8)
+- [x] `quarantine_path` nel risultato Rust — UI mostra path effettivo post-operazione (v0.5.9)
+- [x] Versione dinamica: `getVersion()` da Tauri, propagata via Zustand — nessun hardcoded (v0.5.9)
+- [x] Spiegazione "Groups" in Step 2 Duplicates (v0.5.9)
+- [x] Guardia workspace = destinazione: rifiuto + log error (v0.5.10)
+- [x] Badge `AUTO — subfolder of source` su destinazioni automatiche (v0.5.10)
 
 #### Fase 3 — The Conformer (Modulo B) — _In sviluppo: v0.6.0+_
 

@@ -1,5 +1,5 @@
 /// lib.rs — Entry point Tauri
-/// Runtime SoundMaster Pro — v0.4.1
+/// Runtime SoundMaster Pro — v0.5.10
 
 mod cleaner;
 mod db;
@@ -7,7 +7,9 @@ mod duplicates;
 mod ffmpeg;
 mod ffprobe;
 mod fpcalc;
+mod logger;
 mod scanner;
+mod utils;
 
 use tauri::Manager;
 
@@ -22,6 +24,8 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             db::init_database(&data_dir)?;
+            logger::init(&data_dir);
+            logger::log("App started — DB initialized");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -35,6 +39,7 @@ pub fn run() {
             cleaner::quarantine_non_conform,
             duplicates::detect_duplicates,
             duplicates::resolve_duplicates,
+            logger::get_log_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

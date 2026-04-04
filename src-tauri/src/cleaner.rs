@@ -1,5 +1,5 @@
 /// cleaner.rs — The Cleaner: Non-Conform Detection & Quarantine
-/// Runtime SoundMaster Pro — v0.4.1
+/// Runtime SoundMaster Pro — v0.5.10
 ///
 /// Responsabilità:
 /// - Rilevamento file non-conformi tramite regex su filename (pattern YouTube/video-rip)
@@ -8,12 +8,52 @@
 /// - Quarantena non-distruttiva in `_NonConform/` con gestione collisioni
 /// - Aggiornamento `conforming_status = 'non_conform'` nel DB
 
+use crate::logger;
+use crate::utils::collision_safe_path;
 use regex::Regex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
+use std::sync::OnceLock;
 use tauri::{Emitter, Manager};
+
+// ── Strutture per il parsing JSON di FFprobe (M3 fix — v0.5.5) ──────────────
+//
+// Usano `serde::Deserialize` (già importato) + `serde_json` (in Cargo.toml).
+// Campi non usati non vengono dichiarati — serde ignora i campi extra nel JSON.
+// Strutture private al modulo: non espongono dettagli implementativi.
+
+#[derive(serde::Deserialize)]
+struct FfprobeOutput {
+    streams: Option<Vec<FfprobeStream>>,
+    format: Option<FfprobeFormat>,
+}
+
+/// Flags di disposizione di uno stream FFprobe.
+/// Il campo `attached_pic = 1` indica che lo stream è una copertina album (tag ID3 APIC),
+/// non un video vero. Quasi tutti gli MP3 moderni hanno questo stream — va ignorato.
+#[derive(serde::Deserialize)]
+struct FfprobeDisposition {
+    attached_pic: Option<u8>,
+}
+
+/// Un singolo stream nel JSON FFprobe (`streams[i]`).
+#[derive(serde::Deserialize)]
+struct FfprobeStream {
+    codec_type: Option<String>,
+    /// Durata dello stream in secondi (stringa nel JSON FFprobe, es. "234.123456")
+    duration: Option<String>,
+    /// Disposition flags — contiene `attached_pic` per distinguere cover art da video reali
+    disposition: Option<FfprobeDisposition>,
+}
+
+/// Sezione `format` del JSON FFprobe — contiene la durata del container.
+#[derive(serde::Deserialize)]
+struct FfprobeFormat {
+    /// Durata del container in secondi (stringa nel JSON FFprobe)
+    duration: Option<String>,
+}
 
 // ── Pattern YouTube/non-conform ──────────────────────────────────────────────
 // Applicati al filename (senza estensione), case-insensitive.
@@ -78,20 +118,56 @@ pub struct CleanerResult {
 pub struct QuarantineResult {
     pub moved: u64,
     pub failed: u64,
+    /// Path effettivo della cartella di quarantena (v0.5.9 — mostrato in UI)
+    pub quarantine_path: String,
 }
 
 // ── Logica interna ───────────────────────────────────────────────────────────
 
-/// Compila i pattern regex una sola volta per tutta la sessione di analisi.
-fn build_patterns() -> Vec<Regex> {
-    NON_CONFORM_PATTERNS
-        .iter()
-        .map(|p| Regex::new(&format!("(?i){}", p)).expect("Invalid regex pattern"))
-        .collect()
+/// Pattern regex compilati una sola volta per processo tramite OnceLock.
+///
+/// # Fix L4 (v0.5.6)
+/// La versione precedente usava `build_patterns()` che ricompilava i pattern
+/// a ogni chiamata di `detect_non_conform`, e usava `.expect("Invalid regex pattern")`
+/// senza indicare quale pattern fosse fallito.
+///
+/// OnceLock garantisce:
+/// 1. Compilazione al primo accesso, poi riuso — O(1) per chiamate successive
+/// 2. Panic message con il pattern specifico che ha causato l'errore (debug)
+/// 3. Thread-safe senza lock espliciti
+static COMPILED_PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
+
+fn get_patterns() -> &'static [Regex] {
+    COMPILED_PATTERNS.get_or_init(|| {
+        NON_CONFORM_PATTERNS
+            .iter()
+            .map(|p| {
+                Regex::new(&format!("(?i){p}")).unwrap_or_else(|e| {
+                    panic!("BUG: pattern regex non valido '{}': {}", p, e)
+                })
+            })
+            .collect()
+    })
 }
 
 /// Verifica il filename (senza estensione) contro tutti i pattern YouTube.
 /// Restituisce il pattern grezzo che ha fatto match, o None.
+///
+/// # Gestione pattern YouTube ID (ultimo pattern — fix G3 v0.5.4)
+///
+/// Il pattern `[_\-][a-zA-Z0-9_\-]{11}$` è necessariamente ampio per catturare
+/// tutti gli ID YouTube (11 chars base64url), ma produce falsi positivi su
+/// nomi legittimi come `Track_Remastered1` o `Song_RadioEdit1` che terminano
+/// con underscore + 11 chars alfanumerici.
+///
+/// La distinzione chiave: gli ID YouTube reali sono **sempre alfanumerici misti**
+/// (contengono sia lettere che cifre). Sequenze composte esclusivamente da
+/// lettere (es. `Remastered`) o esclusivamente da cifre (es. `12345678901`)
+/// non sono ID YouTube validi in contesti reali.
+///
+/// Strategia: i pattern 0..n-2 vengono applicati normalmente. Il pattern n-1
+/// (YouTube ID) viene applicato solo se la sequenza da 11 chars contiene
+/// **almeno una lettera E almeno una cifra** (charset misto).
 fn check_youtube_pattern(filename: &str, patterns: &[Regex]) -> Option<String> {
     // Lavora sul file stem (senza estensione) per evitare match sull'estensione
     let stem = Path::new(filename)
@@ -99,19 +175,58 @@ fn check_youtube_pattern(filename: &str, patterns: &[Regex]) -> Option<String> {
         .and_then(|s| s.to_str())
         .unwrap_or(filename);
 
-    for pattern in patterns {
+    let n = patterns.len();
+
+    // Patterns 0..n-2: applicazione diretta — hanno semantica inequivocabile
+    // (es. "(Official Video)", "[Lyrics]", ecc.)
+    for pattern in &patterns[..n.saturating_sub(1)] {
         if pattern.is_match(stem) {
             return Some(pattern.as_str().to_string());
         }
     }
+
+    // Pattern n-1: YouTube video ID standalone alla fine del filename.
+    // Richiede validazione aggiuntiva del charset per evitare falsi positivi.
+    if let Some(id_pattern) = patterns.last() {
+        if id_pattern.is_match(stem) {
+            // Estrae gli ultimi 11 chars del stem (dopo il separatore _/-)
+            let stem_chars: Vec<char> = stem.chars().collect();
+            if stem_chars.len() >= 12 {
+                let suffix: String = stem_chars[stem_chars.len() - 11..].iter().collect();
+                let has_letter = suffix.chars().any(|c| c.is_ascii_alphabetic());
+                let has_digit  = suffix.chars().any(|c| c.is_ascii_digit());
+                // Solo charset misto (lettera + cifra) = plausibile YouTube ID
+                if has_letter && has_digit {
+                    return Some(id_pattern.as_str().to_string());
+                }
+                // Altrimenti: suffisso tutto-lettere (es. "Remastered") o
+                // tutto-cifre (es. "12345678901") → non è un ID YouTube → skip
+            }
+        }
+    }
+
     None
 }
 
 /// Esegue `ffprobe` sul file e restituisce:
-/// - `has_video`: true se è presente uno stream video
-/// - `duration`: durata in secondi (0.0 se non rilevabile)
-/// - `error`: Some(msg) se ffprobe non è eseguibile o restituisce errore
-fn probe_file(path: &str, ffprobe_path: &str) -> (bool, f64, Option<String>) {
+/// - `has_video`: true se è presente almeno uno stream con `codec_type = "video"`
+/// - `duration`: `Some(secs)` se la durata è rilevabile, `None` se assente
+///   (NON indica corruzione — solo metadato mancante nel container)
+/// - `error`: `Some(msg)` se ffprobe non riesce ad aprire il file → file corrotto
+///
+/// # Distinzione critica (fix G1 — v0.5.4, mantenuto in v0.5.5)
+/// `duration == None` ≠ file corrotto. Solo `duration == Some(0.0)` (durata
+/// esplicitamente zero nel JSON) indica file vuoto o troncato.
+///
+/// # JSON parsing (fix M3 — v0.5.5)
+/// Il parsing usa `serde_json` con struct tipizzate invece di string matching.
+/// Questo gestisce correttamente tutte le varianti di formattazione JSON
+/// (spaziatura, indentazione, ordine dei campi) e versioni future di FFprobe.
+///
+/// La duration viene cercata prima in `format.duration` (container, più affidabile),
+/// con fallback al primo `streams[i].duration` trovato (per formati senza container
+/// duration, come certi stream raw o file audio in formato TS).
+fn probe_file(path: &str, ffprobe_path: &str) -> (bool, Option<f64>, Option<String>) {
     let output = Command::new(ffprobe_path)
         .args([
             "-v",
@@ -125,43 +240,79 @@ fn probe_file(path: &str, ffprobe_path: &str) -> (bool, f64, Option<String>) {
         .output();
 
     match output {
-        Err(e) => (false, 0.0, Some(format!("ffprobe non eseguibile: {e}"))),
+        Err(e) => (false, None, Some(format!("ffprobe non eseguibile: {e}"))),
         Ok(out) if !out.status.success() => {
+            // Exit code non-zero: FFprobe non è riuscito ad aprire il file
+            // → file corrotto, troncato o formato completamente illeggibile
             let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
             let msg = if stderr.is_empty() {
                 format!("ffprobe exit code: {}", out.status)
             } else {
                 stderr
             };
-            (false, 0.0, Some(msg))
+            (false, None, Some(msg))
         }
         Ok(out) => {
-            let json = String::from_utf8_lossy(&out.stdout);
-            let has_video = json.contains(r#""codec_type": "video""#)
-                || json.contains(r#""codec_type":"video""#);
-            let duration = extract_duration_from_json(&json);
+            let json_str = String::from_utf8_lossy(&out.stdout);
+
+            // Parsing tipizzato con serde_json — gestisce tutte le varianti
+            // di formattazione senza dipendere dalla spaziatura del JSON
+            let parsed: FfprobeOutput = match serde_json::from_str(&json_str) {
+                Ok(p) => p,
+                Err(_) => {
+                    // JSON malformato con exit code 0 — raro, comportamento
+                    // conservativo: non tagghiamo come corrupt, segnaliamo
+                    // solo che non possiamo leggere i metadati
+                    return (false, None, None);
+                }
+            };
+
+            // Verifica presenza di stream video REALE (codec_type = "video" E attached_pic != 1).
+            //
+            // Fix v0.5.8: quasi tutti gli MP3 moderni hanno una copertina album (tag ID3 APIC)
+            // incorporata nel file. FFprobe la riporta come stream con codec_type = "video",
+            // causando falsi positivi su praticamente tutta la libreria.
+            //
+            // La distinzione corretta è nel campo disposition.attached_pic:
+            //   attached_pic = 1  → è una copertina album (ignorare)
+            //   attached_pic = 0  → è un vero stream video (segnalare)
+            //   campo assente     → trattare come 0 (conservativo: segnalare)
+            let has_video = parsed
+                .streams
+                .as_ref()
+                .map_or(false, |streams| {
+                    streams.iter().any(|s| {
+                        s.codec_type.as_deref() == Some("video")
+                            && s.disposition
+                                .as_ref()
+                                .and_then(|d| d.attached_pic)
+                                .unwrap_or(0)
+                                != 1
+                    })
+                });
+
+            // Duration: prima dal container format (più affidabile per la
+            // durata totale), poi dal primo stream con duration disponibile
+            // (fallback per formati senza container duration, es. raw AAC/MP3)
+            let duration = parsed
+                .format
+                .as_ref()
+                .and_then(|f| f.duration.as_deref())
+                .and_then(|d| d.parse::<f64>().ok())
+                .or_else(|| {
+                    parsed.streams.as_ref().and_then(|streams| {
+                        streams
+                            .iter()
+                            .filter_map(|s| {
+                                s.duration.as_deref().and_then(|d| d.parse::<f64>().ok())
+                            })
+                            .next()
+                    })
+                });
+
             (has_video, duration, None)
         }
     }
-}
-
-/// Estrae il valore di `"duration"` dal JSON FFprobe senza dipendenze extra.
-/// Cerca la prima occorrenza — di solito nella sezione `format`.
-fn extract_duration_from_json(json: &str) -> f64 {
-    if let Some(pos) = json.find("\"duration\"") {
-        let after = &json[pos + 10..]; // salta `"duration"`
-        // Cerca la stringa del valore: `": "XX.XX"`
-        if let Some(colon) = after.find(':') {
-            let value_area = after[colon + 1..].trim_start();
-            if value_area.starts_with('"') {
-                let inner = &value_area[1..];
-                if let Some(end) = inner.find('"') {
-                    return inner[..end].parse::<f64>().unwrap_or(0.0);
-                }
-            }
-        }
-    }
-    0.0
 }
 
 // ── Logica detect (sincrona — chiamata da spawn_blocking) ────────────────────
@@ -207,9 +358,19 @@ fn detect_non_conform_impl(
         .collect();
 
     let total = tracks.len() as u64;
-    let patterns = build_patterns();
+    let patterns = get_patterns();
     let ffprobe = ffprobe_path.as_deref();
     let mut non_conform: Vec<NonConformItem> = Vec::new();
+
+    logger::log_separator("CLEANER — NON-CONFORM DETECTION");
+    logger::log_detail("CLEANER", &format!("Track da analizzare: {}", total));
+    logger::log_detail(
+        "CLEANER",
+        &format!(
+            "FFprobe: {}",
+            ffprobe.unwrap_or("non disponibile — skip video/corrupt check")
+        ),
+    );
 
     // Evento iniziale
     let _ = app.emit(
@@ -242,6 +403,13 @@ fn detect_non_conform_impl(
 
         // ── 1. Pattern YouTube / video-rip (filename) ────────────────────────
         if let Some(matched_pattern) = check_youtube_pattern(&track.filename, &patterns) {
+            logger::log_detail(
+                "CLEANER",
+                &format!(
+                    "NON-CONFORM youtube_pattern | {} | pattern: {}",
+                    track.filename, matched_pattern
+                ),
+            );
             non_conform.push(NonConformItem {
                 id: track.id,
                 path: track.path.clone(),
@@ -258,7 +426,13 @@ fn detect_non_conform_impl(
             let (has_video, duration, probe_err) = probe_file(&track.path, ffprobe_bin);
 
             if let Some(err_msg) = probe_err {
-                // File corrotto: FFprobe non riesce ad aprirlo
+                logger::log_detail(
+                    "CLEANER",
+                    &format!(
+                        "NON-CONFORM corrupt | {} | ffprobe: {}",
+                        track.filename, err_msg
+                    ),
+                );
                 non_conform.push(NonConformItem {
                     id: track.id,
                     path: track.path.clone(),
@@ -268,7 +442,13 @@ fn detect_non_conform_impl(
                     file_size_bytes: track.size,
                 });
             } else if has_video {
-                // File video mascherato da audio
+                logger::log_detail(
+                    "CLEANER",
+                    &format!(
+                        "NON-CONFORM video_stream | {} | video codec rilevato da FFprobe",
+                        track.filename
+                    ),
+                );
                 non_conform.push(NonConformItem {
                     id: track.id,
                     path: track.path.clone(),
@@ -277,19 +457,35 @@ fn detect_non_conform_impl(
                     reason_detail: "Video codec stream rilevato da FFprobe".to_string(),
                     file_size_bytes: track.size,
                 });
-            } else if duration == 0.0 {
-                // Durata zero: file vuoto o corrotto
+            } else if duration == Some(0.0) {
+                logger::log_detail(
+                    "CLEANER",
+                    &format!(
+                        "NON-CONFORM corrupt | {} | duration=0.0 (file vuoto o troncato)",
+                        track.filename
+                    ),
+                );
                 non_conform.push(NonConformItem {
                     id: track.id,
                     path: track.path.clone(),
                     filename: track.filename.clone(),
                     reason: "corrupt".to_string(),
-                    reason_detail: "Durata 0 — file vuoto o corrotto".to_string(),
+                    reason_detail: "Durata 0 rilevata da FFprobe — file vuoto o corrotto"
+                        .to_string(),
                     file_size_bytes: track.size,
                 });
             }
         }
     }
+
+    logger::log_detail(
+        "CLEANER",
+        &format!(
+            "Detection completata: {}/{} non-conformi trovati",
+            non_conform.len(),
+            total
+        ),
+    );
 
     // Evento completamento
     let _ = app.emit(
@@ -338,6 +534,16 @@ fn quarantine_non_conform_impl(
     let mut moved = 0u64;
     let mut failed = 0u64;
 
+    logger::log_separator("CLEANER — QUARANTINE NON-CONFORM");
+    logger::log_detail(
+        "CLEANER",
+        &format!(
+            "Quarantena {} file → {}",
+            track_ids.len(),
+            quarantine_dir.display()
+        ),
+    );
+
     for id in &track_ids {
         let row: rusqlite::Result<(String, String)> = conn.query_row(
             "SELECT path, filename FROM tracks WHERE id = ?1",
@@ -368,7 +574,10 @@ fn quarantine_non_conform_impl(
                 match std::fs::rename(src, &dest) {
                     Ok(_) => {
                         moved += 1;
-                        // Aggiorna path e status nel DB
+                        logger::log_detail(
+                            "CLEANER",
+                            &format!("SPOSTATO: {} → {}", filename, dest.display()),
+                        );
                         let dest_str = dest.to_string_lossy().to_string();
                         let _ = conn.execute(
                             "UPDATE tracks SET path=?1, conforming_status='non_conform' WHERE id=?2",
@@ -376,6 +585,10 @@ fn quarantine_non_conform_impl(
                         );
                     }
                     Err(e) => {
+                        logger::log_detail(
+                            "CLEANER",
+                            &format!("ERRORE spostamento {}: {}", src_path, e),
+                        );
                         eprintln!("[Cleaner] Move failed for {src_path}: {e}");
                         failed += 1;
                     }
@@ -384,35 +597,12 @@ fn quarantine_non_conform_impl(
         }
     }
 
-    Ok(QuarantineResult { moved, failed })
-}
-
-/// Restituisce un path di destinazione che non causa collisioni.
-/// Se `filename` esiste già in `dir`, aggiunge suffisso `_1`, `_2`, ecc.
-fn collision_safe_path(dir: &Path, filename: &str) -> std::path::PathBuf {
-    let candidate = dir.join(filename);
-    if !candidate.exists() {
-        return candidate;
-    }
-
-    let stem = Path::new(filename)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or(filename);
-    let ext = Path::new(filename)
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|e| format!(".{e}"))
-        .unwrap_or_default();
-
-    let mut counter = 1u32;
-    loop {
-        let candidate = dir.join(format!("{stem}_{counter}{ext}"));
-        if !candidate.exists() {
-            return candidate;
-        }
-        counter += 1;
-    }
+    let quarantine_path_str = quarantine_dir.to_string_lossy().to_string();
+    logger::log_detail(
+        "CLEANER",
+        &format!("Quarantena completata: {} spostati, {} falliti → {}", moved, failed, quarantine_path_str),
+    );
+    Ok(QuarantineResult { moved, failed, quarantine_path: quarantine_path_str })
 }
 
 // ── Comandi Tauri pubblici ───────────────────────────────────────────────────

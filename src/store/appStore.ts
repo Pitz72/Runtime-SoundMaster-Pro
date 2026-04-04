@@ -1,6 +1,6 @@
 /**
  * appStore.ts — Zustand Store Globale
- * Runtime SoundMaster Pro v0.1.0
+ * Runtime SoundMaster Pro v0.5.10
  *
  * Stato globale dell'applicazione:
  * - Navigazione tra Hub e moduli
@@ -79,6 +79,7 @@ export interface CleanerResult {
 export interface QuarantineResult {
   moved: number;
   failed: number;
+  quarantine_path: string;  // path effettivo dove sono stati spostati i file (v0.5.9)
 }
 
 // ── Tipi duplicates.rs ────────────────────────────────────────────────────
@@ -122,6 +123,7 @@ export interface DuplicateDetectResult {
 export interface DuplicateResolveResult {
   moved: number;
   failed: number;
+  quarantine_path: string;  // path effettivo dove sono stati spostati i file (v0.5.9)
 }
 
 export interface SystemStatus {
@@ -144,6 +146,10 @@ export interface SystemStatus {
 // --- Store Interface ---
 
 interface AppState {
+  // Versione app (letta da Tauri al boot — evita hardcoded nei componenti)
+  appVersion: string;
+  setAppVersion: (v: string) => void;
+
   // Navigazione
   currentModule: ModuleId;
   setModule: (module: ModuleId) => void;
@@ -212,6 +218,10 @@ function newLogId(): string {
 // --- Store ---
 
 export const useAppStore = create<AppState>((set) => ({
+  // Versione app — aggiornata da App.tsx via getVersion() Tauri
+  appVersion: '0.5.9',
+  setAppVersion: (v) => set({ appVersion: v }),
+
   // Navigazione
   currentModule: "hub",
   setModule: (module) =>

@@ -33,7 +33,7 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { currentModule, setModule, systemStatus } = useAppStore();
+  const { currentModule, setModule, systemStatus, appVersion } = useAppStore();
   const mainRef = useRef<HTMLElement>(null);
 
   // Scroll al top del contenuto ad ogni cambio di modulo.
@@ -65,7 +65,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             SOUNDMASTER
           </h1>
           <p className="font-sans font-bold tracking-tighter uppercase text-[10px] text-industrial-text-dim/50">
-            V3.4.1 PRO
+            V{appVersion}
           </p>
         </div>
 

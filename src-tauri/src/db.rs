@@ -1,5 +1,5 @@
 /// db.rs — Modulo Database SQLite
-/// Runtime SoundMaster Pro — v0.1.0
+/// Runtime SoundMaster Pro — v0.5.9
 ///
 /// Responsabilità:
 /// - Inizializzazione del database `library.db` con WAL mode

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import type {
+  LibraryStats,
   CleanerResult, QuarantineResult, ScanResult,
   DuplicateDetectResult, DuplicateGroup, DuplicateResolveResult,
 } from '../../store/appStore';
@@ -107,8 +108,8 @@ function ProgressBar({ processed, total, label }: { processed: number; total: nu
 
 export function CleanerModule() {
   const {
-    addLog, workspacePath, setWorkspacePath, systemStatus,
-    isScanning, setIsScanning,
+    addLog, workspacePath, setWorkspacePath, systemStatus, appVersion,
+    isScanning, setIsScanning, scanProgress,
     isCleanerRunning, setIsCleanerRunning, cleanerProgress, setCleanerProgress,
     nonConformItems, setNonConformItems,
     isDuplicateRunning, setIsDuplicateRunning, duplicateProgress, setDuplicateProgress,
@@ -139,8 +140,11 @@ export function CleanerModule() {
   const fpcalcPath = systemStatus.fpcalcPath;
 
   // Path destinazione effettivi
-  const ncDestPath = customNcDest ?? (workspacePath ? `${workspacePath}\\_NonConform` : null);
-  const dupDestPath = customDupDest ?? (workspacePath ? `${workspacePath}\\_Duplicates` : null);
+  // Rileva il separatore dal workspace path ricevuto dal dialog di sistema
+  // per restare cross-platform (Windows usa \, macOS/Linux usano /)
+  const pathSep = workspacePath?.includes('\\') ? '\\' : '/';
+  const ncDestPath = customNcDest ?? (workspacePath ? `${workspacePath}${pathSep}_NonConform` : null);
+  const dupDestPath = customDupDest ?? (workspacePath ? `${workspacePath}${pathSep}_Duplicates` : null);
 
   // ── Workspace select + scan ────────────────────────────────────────────
   const handleSelectWorkspace = async () => {
@@ -175,12 +179,24 @@ export function CleanerModule() {
 
   const handleBrowseNcDest = async () => {
     const selected = await open({ directory: true, multiple: false, title: 'Select Non-Conform destination folder' });
-    if (selected && !Array.isArray(selected)) setCustomNcDest(selected);
+    if (selected && !Array.isArray(selected)) {
+      if (selected === workspacePath) {
+        addLog('error', 'Invalid destination: cannot use the source workspace as destination. A subfolder will be created automatically.');
+        return;
+      }
+      setCustomNcDest(selected);
+    }
   };
 
   const handleBrowseDupDest = async () => {
     const selected = await open({ directory: true, multiple: false, title: 'Select Duplicates destination folder' });
-    if (selected && !Array.isArray(selected)) setCustomDupDest(selected);
+    if (selected && !Array.isArray(selected)) {
+      if (selected === workspacePath) {
+        addLog('error', 'Invalid destination: cannot use the source workspace as destination. A subfolder will be created automatically.');
+        return;
+      }
+      setCustomDupDest(selected);
+    }
   };
 
   const selectedGroup = duplicateGroups.find(g => g.group_id === selectedGroupId) ?? null;
@@ -255,12 +271,11 @@ export function CleanerModule() {
         quarantinePath: customNcDest ?? null,
       });
       setNcQuarantineResult(result);
-      // Refresh stats hub
-      const { invoke: inv } = await import('@tauri-apps/api/core');
+      // Refresh stats hub — usa l'invoke già importato staticamente
       try {
-        const stats = await inv('get_library_stats');
-        setLibraryStats(stats as any);
-      } catch { /* non bloccante */ }
+        const stats = await invoke<LibraryStats>('get_library_stats');
+        setLibraryStats(stats);
+      } catch { /* non bloccante — le stats vengono aggiornate al prossimo avvio */ }
       addLog(
         result.failed > 0 ? 'warning' : 'success',
         `Quarantine complete — ${result.moved} moved, ${result.failed} failed`
@@ -329,11 +344,11 @@ export function CleanerModule() {
         quarantinePath: customDupDest ?? null,
       });
       setDupResolveResult(result);
-      const { invoke: inv } = await import('@tauri-apps/api/core');
+      // Refresh stats hub — usa l'invoke già importato staticamente
       try {
-        const stats = await inv('get_library_stats');
-        setLibraryStats(stats as any);
-      } catch { /* non bloccante */ }
+        const stats = await invoke<LibraryStats>('get_library_stats');
+        setLibraryStats(stats);
+      } catch { /* non bloccante — le stats vengono aggiornate al prossimo avvio */ }
       addLog(
         result.failed > 0 ? 'warning' : 'success',
         `Resolve complete — ${result.moved} moved, ${result.failed} failed`
@@ -365,7 +380,7 @@ export function CleanerModule() {
             <div>
               <h2 className="text-2xl font-black font-sans tracking-tighter uppercase">THE CLEANER</h2>
               <p className="text-[10px] font-mono text-industrial-text-dim uppercase tracking-widest">
-                Sanitization Pipeline v5.0
+                Sanitization Pipeline v{appVersion}
               </p>
             </div>
           </div>
@@ -454,7 +469,14 @@ export function CleanerModule() {
                   <div className="p-4 flex items-center gap-4">
                     <FolderInput className="w-4 h-4 text-industrial-red flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-mono text-industrial-text-dim uppercase tracking-widest mb-0.5">Non-Conform Destination</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-[9px] font-mono text-industrial-text-dim uppercase tracking-widest">Non-Conform Destination</p>
+                        {!customNcDest && workspacePath && (
+                          <span className="text-[7px] font-mono font-bold uppercase px-1.5 py-0.5 bg-industrial-amber/10 text-industrial-amber border border-industrial-amber/30">
+                            AUTO — subfolder of source
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] font-mono truncate text-industrial-red">
                         {ncDestPath ?? '— select a workspace first —'}
                       </p>
@@ -464,7 +486,7 @@ export function CleanerModule() {
                         onClick={handleBrowseNcDest}
                         className="flex-shrink-0 border border-industrial-border text-industrial-text-dim px-4 py-1.5 text-[9px] font-mono uppercase tracking-widest hover:border-industrial-red hover:text-industrial-red transition-all"
                       >
-                        Change
+                        {customNcDest ? 'Change' : 'Override'}
                       </button>
                     )}
                   </div>
@@ -503,6 +525,29 @@ export function CleanerModule() {
                       />
                       <p className="text-[9px] font-mono text-industrial-cyan uppercase">
                         {cleanerProgress.found} non-conform detected so far
+                      </p>
+                    </div>
+                  )}
+                  {/* Progress bar scansione workspace — visibile solo durante isScanning */}
+                  {isScanning && scanProgress && (
+                    <div className="w-full max-w-md mb-4 space-y-2">
+                      <div className="flex justify-between font-mono text-[9px] text-industrial-amber uppercase">
+                        <span>Workspace scan in progress — please wait</span>
+                        <span>
+                          {scanProgress.total > 0
+                            ? `${scanProgress.scanned.toLocaleString()} / ${scanProgress.total.toLocaleString()}`
+                            : 'Discovering...'}
+                        </span>
+                      </div>
+                      <div className="h-0.5 bg-industrial-border w-full">
+                        <motion.div
+                          className="h-full bg-industrial-amber"
+                          animate={{ width: scanProgress.total > 0 ? `${(scanProgress.scanned / scanProgress.total) * 100}%` : '0%' }}
+                          transition={{ ease: 'linear', duration: 0.3 }}
+                        />
+                      </div>
+                      <p className="text-[8px] font-mono text-industrial-text-dim truncate text-center">
+                        {scanProgress.current_file || scanProgress.phase}
                       </p>
                     </div>
                   )}
@@ -619,7 +664,7 @@ export function CleanerModule() {
                 ) : (
                   <div className="text-center">
                     <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Quarantine Complete</h3>
-                    <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto mb-12">
+                    <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto mb-6">
                       <div className="bg-black border border-industrial-border p-6">
                         <p className="text-[10px] font-mono text-industrial-cyan uppercase mb-1">Moved</p>
                         <p className="text-4xl font-black font-mono text-industrial-cyan">{ncQuarantineResult.moved}</p>
@@ -628,6 +673,10 @@ export function CleanerModule() {
                         <p className={`text-[10px] font-mono uppercase mb-1 ${ncQuarantineResult.failed > 0 ? 'text-industrial-red' : 'text-industrial-text-dim'}`}>Failed</p>
                         <p className={`text-4xl font-black font-mono ${ncQuarantineResult.failed > 0 ? 'text-industrial-red' : 'text-white'}`}>{ncQuarantineResult.failed}</p>
                       </div>
+                    </div>
+                    <div className="max-w-lg mx-auto mb-8 p-3 border border-industrial-border/50 bg-black">
+                      <p className="text-[9px] font-mono text-industrial-text-dim uppercase tracking-widest mb-1">Files moved to</p>
+                      <p className="text-[11px] font-mono text-industrial-cyan truncate">{ncQuarantineResult.quarantine_path}</p>
                     </div>
                     <button onClick={handleNcReset} className="bg-industrial-amber text-black px-12 py-4 font-bold text-xs uppercase tracking-widest hover:bg-white transition-all active:scale-95">New Analysis</button>
                   </div>
@@ -672,7 +721,14 @@ export function CleanerModule() {
                   <div className="p-4 flex items-center gap-4">
                     <FolderInput className="w-4 h-4 text-industrial-cyan flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-mono text-industrial-text-dim uppercase tracking-widest mb-0.5">Duplicates Destination</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-[9px] font-mono text-industrial-text-dim uppercase tracking-widest">Duplicates Destination</p>
+                        {!customDupDest && workspacePath && (
+                          <span className="text-[7px] font-mono font-bold uppercase px-1.5 py-0.5 bg-industrial-amber/10 text-industrial-amber border border-industrial-amber/30">
+                            AUTO — subfolder of source
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] font-mono truncate text-industrial-cyan">
                         {dupDestPath ?? '— select a workspace first —'}
                       </p>
@@ -682,7 +738,7 @@ export function CleanerModule() {
                         onClick={handleBrowseDupDest}
                         className="flex-shrink-0 border border-industrial-border text-industrial-text-dim px-4 py-1.5 text-[9px] font-mono uppercase tracking-widest hover:border-industrial-cyan hover:text-industrial-cyan transition-all"
                       >
-                        Change
+                        {customDupDest ? 'Change' : 'Override'}
                       </button>
                     )}
                   </div>
@@ -738,6 +794,29 @@ export function CleanerModule() {
                     </div>
                   )}
 
+                  {/* Progress bar scansione workspace — visibile solo durante isScanning */}
+                  {isScanning && scanProgress && (
+                    <div className="w-full max-w-md mb-4 space-y-2">
+                      <div className="flex justify-between font-mono text-[9px] text-industrial-amber uppercase">
+                        <span>Workspace scan in progress — please wait</span>
+                        <span>
+                          {scanProgress.total > 0
+                            ? `${scanProgress.scanned.toLocaleString()} / ${scanProgress.total.toLocaleString()}`
+                            : 'Discovering...'}
+                        </span>
+                      </div>
+                      <div className="h-0.5 bg-industrial-border w-full">
+                        <motion.div
+                          className="h-full bg-industrial-amber"
+                          animate={{ width: scanProgress.total > 0 ? `${(scanProgress.scanned / scanProgress.total) * 100}%` : '0%' }}
+                          transition={{ ease: 'linear', duration: 0.3 }}
+                        />
+                      </div>
+                      <p className="text-[8px] font-mono text-industrial-text-dim truncate text-center">
+                        {scanProgress.current_file || scanProgress.phase}
+                      </p>
+                    </div>
+                  )}
                   {!isDuplicateRunning && (
                     <button
                       onClick={handleDupStart}
@@ -762,7 +841,10 @@ export function CleanerModule() {
                 {/* Left: group list */}
                 <div className="lg:col-span-4 space-y-3">
                   <div className="bg-black p-4 border border-industrial-border flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-industrial-text-dim uppercase">{duplicateGroups.length} groups</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-mono text-industrial-text-dim uppercase">{duplicateGroups.length} groups detected</span>
+                      <span className="text-[8px] font-mono text-industrial-text-dim/60 uppercase">A group = 2+ files identified as duplicates of each other</span>
+                    </div>
                     <button onClick={handleDupReset} className="text-[9px] font-mono text-industrial-text-dim hover:text-white uppercase underline underline-offset-4">Re-scan</button>
                   </div>
 
@@ -890,7 +972,7 @@ export function CleanerModule() {
                 ) : (
                   <div className="text-center">
                     <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Resolve Complete</h3>
-                    <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto mb-12">
+                    <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto mb-6">
                       <div className="bg-black border border-industrial-border p-6">
                         <p className="text-[10px] font-mono text-industrial-cyan uppercase mb-1">Moved</p>
                         <p className="text-4xl font-black font-mono text-industrial-cyan">{dupResolveResult.moved}</p>
@@ -899,6 +981,10 @@ export function CleanerModule() {
                         <p className={`text-[10px] font-mono uppercase mb-1 ${dupResolveResult.failed > 0 ? 'text-industrial-red' : 'text-industrial-text-dim'}`}>Failed</p>
                         <p className={`text-4xl font-black font-mono ${dupResolveResult.failed > 0 ? 'text-industrial-red' : 'text-white'}`}>{dupResolveResult.failed}</p>
                       </div>
+                    </div>
+                    <div className="max-w-lg mx-auto mb-8 p-3 border border-industrial-border/50 bg-black">
+                      <p className="text-[9px] font-mono text-industrial-text-dim uppercase tracking-widest mb-1">Files moved to</p>
+                      <p className="text-[11px] font-mono text-industrial-cyan truncate">{dupResolveResult.quarantine_path}</p>
                     </div>
                     <button onClick={handleDupReset} className="bg-industrial-amber text-black px-12 py-4 font-bold text-xs uppercase tracking-widest hover:bg-white transition-all active:scale-95">
                       New Analysis

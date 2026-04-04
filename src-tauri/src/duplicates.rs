@@ -1,5 +1,5 @@
 /// duplicates.rs — The Cleaner: Duplicate Detection & Resolution
-/// Runtime SoundMaster Pro — v0.5.0
+/// Runtime SoundMaster Pro — v0.5.9
 ///
 /// Responsabilità:
 /// - Phase 1 "binary": SHA-256 su file della stessa dimensione → duplicati esatti
@@ -9,6 +9,8 @@
 /// - Quarantena non-distruttiva in `_Duplicates/` con gestione collisioni
 /// - Aggiornamento `conforming_status = 'duplicate'` nel DB per i loser
 
+use crate::logger;
+use crate::utils::collision_safe_path;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -70,6 +72,8 @@ pub struct DuplicateDetectResult {
 pub struct DuplicateResolveResult {
     pub moved: u64,
     pub failed: u64,
+    /// Path effettivo della cartella duplicati (v0.5.9 — mostrato in UI)
+    pub quarantine_path: String,
 }
 
 // ── Track row da DB ──────────────────────────────────────────────────────────
@@ -257,13 +261,21 @@ fn detect_duplicates_impl(
     let conn = Connection::open(data_dir.join("library.db"))
         .map_err(|e| format!("Cannot open DB: {e}"))?;
 
-    // Legge tutti i track che non sono non_conform
+    // Legge solo i track non ancora flaggati come problematici.
+    // FIX G2 (v0.5.4): la query originale escludeva solo 'non_conform', il che
+    // includeva i file con conforming_status='duplicate' (già spostati in
+    // _Duplicates/ e con path aggiornato nel DB). Su una seconda esecuzione,
+    // detect_duplicates li ri-raggruppava e resolve_duplicates li spostava di
+    // nuovo (_duplicate → _duplicate_1, ecc.) in loop infinito.
+    // La query corretta esclude sia 'non_conform' che 'duplicate': analizza
+    // solo file 'unknown' (non ancora analizzati) e 'ok' (puliti, ma
+    // potenzialmente duplicati di file appena aggiunti).
     let mut stmt = conn
         .prepare(
             "SELECT id, path, filename, artist, title, bitrate, duration_secs, \
              COALESCE(file_size_bytes, 0), format \
              FROM tracks \
-             WHERE conforming_status != 'non_conform' \
+             WHERE conforming_status NOT IN ('non_conform', 'duplicate') \
              ORDER BY id",
         )
         .map_err(|e| format!("DB prepare failed: {e}"))?;
@@ -288,6 +300,16 @@ fn detect_duplicates_impl(
 
     let total = tracks.len() as u64;
     let mut groups: Vec<DuplicateGroup> = Vec::new();
+
+    logger::log_separator("DUPLICATES — DETECTION");
+    logger::log_detail("DUPLICATES", &format!("Track da analizzare: {}", total));
+    logger::log_detail(
+        "DUPLICATES",
+        &format!(
+            "fpcalc: {}",
+            fpcalc_path.as_deref().unwrap_or("non disponibile — skip acoustic phase")
+        ),
+    );
     // Traccia quali id sono già stati assegnati a un gruppo
     let mut grouped_ids: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut group_counter = 0u64;
@@ -344,6 +366,17 @@ fn detect_duplicates_impl(
                 .collect();
             let best_id = pick_best(&members);
             group_counter += 1;
+            let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
+            logger::log_detail(
+                "DUPLICATES",
+                &format!(
+                    "GRUPPO binary_hash [{}]: {} file — best_pick id={} ({})",
+                    group_counter,
+                    members.len(),
+                    best_id,
+                    filenames.join(" | ")
+                ),
+            );
             groups.push(DuplicateGroup {
                 group_id: format!("dup-{group_counter}"),
                 match_type: "binary_hash".to_string(),
@@ -398,6 +431,17 @@ fn detect_duplicates_impl(
             .collect();
         let best_id = pick_best(&members);
         group_counter += 1;
+        let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
+        logger::log_detail(
+            "DUPLICATES",
+            &format!(
+                "GRUPPO metadata [{}]: {} file — best_pick id={} ({})",
+                group_counter,
+                members.len(),
+                best_id,
+                filenames.join(" | ")
+            ),
+        );
         groups.push(DuplicateGroup {
             group_id: format!("dup-{group_counter}"),
             match_type: "metadata".to_string(),
@@ -443,12 +487,24 @@ fn detect_duplicates_impl(
                 );
             }
 
-            if let Some((fp, _dur)) = run_fpcalc(&t.path, fpcalc_bin) {
+            if let Some((fp, dur)) = run_fpcalc(&t.path, fpcalc_bin) {
                 // Salva fingerprint nel DB per uso futuro
                 let _ = conn.execute(
                     "UPDATE tracks SET fingerprint = ?1 WHERE id = ?2",
                     rusqlite::params![fp, t.id],
                 );
+                // Fix L5 (v0.5.6): popola duration_secs se assente nel DB.
+                // fpcalc calcola la durata decodificando il file — è affidabile
+                // quanto FFprobe. Utile per track aggiunti prima che FFprobe
+                // fosse disponibile o con metadati ID3 mancanti/corrotti.
+                // La condizione `AND duration_secs IS NULL` garantisce che non
+                // sovrascriva una duration già presente da FFprobe o dai tag ID3.
+                if t.duration_secs.is_none() && dur > 0.0 {
+                    let _ = conn.execute(
+                        "UPDATE tracks SET duration_secs = ?1 WHERE id = ?2 AND duration_secs IS NULL",
+                        rusqlite::params![dur, t.id],
+                    );
+                }
                 // Usa i primi 120 caratteri come chiave di confronto
                 // (fingerprint identici hanno stesso prefisso)
                 let key = fp.chars().take(120).collect::<String>();
@@ -463,6 +519,17 @@ fn detect_duplicates_impl(
                 .collect();
             let best_id = pick_best(&members);
             group_counter += 1;
+            let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
+            logger::log_detail(
+                "DUPLICATES",
+                &format!(
+                    "GRUPPO acoustic [{}]: {} file — best_pick id={} ({})",
+                    group_counter,
+                    members.len(),
+                    best_id,
+                    filenames.join(" | ")
+                ),
+            );
             groups.push(DuplicateGroup {
                 group_id: format!("dup-{group_counter}"),
                 match_type: "acoustic".to_string(),
@@ -483,6 +550,15 @@ fn detect_duplicates_impl(
             current_file: String::new(),
             groups_found: groups.len() as u64,
         },
+    );
+
+    logger::log_detail(
+        "DUPLICATES",
+        &format!(
+            "Detection completata: {} gruppi trovati su {} track analizzati",
+            groups.len(),
+            total
+        ),
     );
 
     Ok(DuplicateDetectResult {
@@ -519,6 +595,16 @@ fn resolve_duplicates_impl(
     let mut moved = 0u64;
     let mut failed = 0u64;
 
+    logger::log_separator("DUPLICATES — RESOLVE");
+    logger::log_detail(
+        "DUPLICATES",
+        &format!(
+            "Risoluzione {} gruppi → {}",
+            resolutions.len(),
+            quarantine_dir.display()
+        ),
+    );
+
     for (_keep_id, loser_ids) in &resolutions {
         for id in loser_ids {
             let row: rusqlite::Result<(String, String)> = conn.query_row(
@@ -547,6 +633,10 @@ fn resolve_duplicates_impl(
                     match std::fs::rename(src, &dest) {
                         Ok(_) => {
                             moved += 1;
+                            logger::log_detail(
+                                "DUPLICATES",
+                                &format!("SPOSTATO: {} → {}", filename, dest.display()),
+                            );
                             let dest_str = dest.to_string_lossy().to_string();
                             let _ = conn.execute(
                                 "UPDATE tracks SET path=?1, conforming_status='duplicate' WHERE id=?2",
@@ -554,6 +644,10 @@ fn resolve_duplicates_impl(
                             );
                         }
                         Err(e) => {
+                            logger::log_detail(
+                                "DUPLICATES",
+                                &format!("ERRORE spostamento {}: {}", src_path, e),
+                            );
                             eprintln!("[Duplicates] Move failed for {src_path}: {e}");
                             failed += 1;
                         }
@@ -563,32 +657,12 @@ fn resolve_duplicates_impl(
         }
     }
 
-    Ok(DuplicateResolveResult { moved, failed })
-}
-
-/// Collision-safe: aggiunge `_1`, `_2`, ecc. se il file esiste già.
-fn collision_safe_path(dir: &Path, filename: &str) -> std::path::PathBuf {
-    let candidate = dir.join(filename);
-    if !candidate.exists() {
-        return candidate;
-    }
-    let stem = Path::new(filename)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or(filename);
-    let ext = Path::new(filename)
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|e| format!(".{e}"))
-        .unwrap_or_default();
-    let mut counter = 1u32;
-    loop {
-        let candidate = dir.join(format!("{stem}_{counter}{ext}"));
-        if !candidate.exists() {
-            return candidate;
-        }
-        counter += 1;
-    }
+    let quarantine_path_str = quarantine_dir.to_string_lossy().to_string();
+    logger::log_detail(
+        "DUPLICATES",
+        &format!("Resolve completata: {} spostati, {} falliti → {}", moved, failed, quarantine_path_str),
+    );
+    Ok(DuplicateResolveResult { moved, failed, quarantine_path: quarantine_path_str })
 }
 
 // ── Comandi Tauri pubblici ───────────────────────────────────────────────────

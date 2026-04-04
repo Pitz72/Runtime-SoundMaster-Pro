@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
 import { AnimatePresence } from "framer-motion";
 
 import { useAppStore } from "./store/appStore";
@@ -46,6 +47,7 @@ export default function App() {
     setCleanerProgress,
     setIsDuplicateRunning,
     setDuplicateProgress,
+    setAppVersion,
   } = useAppStore();
 
   // ── Inizializzazione Tauri ─────────────────────────────────────────────────
@@ -55,6 +57,10 @@ export default function App() {
     const init = async () => {
       addLog("info", "System initialization in progress...");
       try {
+        // Legge la versione app dal manifesto Tauri (evita hardcoded nei componenti)
+        const version = await getVersion();
+        setAppVersion(version);
+
         const [db, ffmpeg, ffprobe, fpcalc] = await Promise.all([
           invoke<string>("db_status"),
           invoke<TauriFfmpegInfo>("detect_ffmpeg_cmd"),
@@ -113,7 +119,7 @@ export default function App() {
     };
 
     init();
-  }, [systemStatus.initialized, setSystemStatus, addLog, setLibraryStats]);
+  }, [systemStatus.initialized, setSystemStatus, addLog, setLibraryStats, setAppVersion]);
 
   // ── Listener globale eventi scan-progress ─────────────────────────────────
   // Registrato una sola volta al mount — gestisce progress e refresh stats

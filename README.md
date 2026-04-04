@@ -1,6 +1,6 @@
 # Runtime SoundMaster Pro
 
-**Versione corrente: v0.5.3** — The Cleaner completato e operativo
+**Versione corrente: v0.5.8** — The Cleaner completato e operativo
 
 Strumento desktop professionale per la sanificazione e gestione di librerie audio per operatori di radio web (Shoutcast, Icecast, RadioDJ, MB STUDIO, Azuracast, Liquidsoap).
 
