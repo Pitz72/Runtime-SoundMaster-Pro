@@ -1,5 +1,7 @@
 # 🎙️ PIANIFICAZIONE: Runtime SoundMaster Pro
+
 ## L'Universal Radio Sanitizer per Web Radio Moderne
+
 ### Versione Piano: 2.0 — Aggiornato con analisi progetti sorgente
 
 ---
@@ -9,7 +11,7 @@
 **Runtime SoundMaster Pro** è la convergenza finale di quattro strumenti separati sviluppati nel corso degli anni:
 
 | Progetto | Eredità | Stato | Percorso Locale |
-|---------|---------|-------|-----------------|
+| :--- | :--- | :--- | :--- |
 | `TuneUp 3.0.2` / `tuneup` | Gestore Duplicati Musicali (Python → Electron/TS) | Archiviato | [TuneUp 3.0.2](file:///C:/Users/Utente/Documents/SVILUPPO/UTILITY/TuneUp%203.0.2) · [tuneup (GitHub)](file:///C:/Users/Utente/Documents/GitHub/tuneup) |
 | `LiquidSopaConformer` | Audio & Metadata Converter (Python/CustomTkinter) | Archiviato | [LiquidSopaConformer](file:///C:/Users/Utente/Documents/GitHub/LiquidSopaConformer) |
 | `RuntimeAudioManagerPro` | Suite unificata con SQLite (Electron/TS) | **Archiviato al v0.3.8 — 18/03/2026** | [RuntimeAudioManagerPro](file:///C:/Users/Utente/Documents/GitHub/RuntimeAudioManagerPro) |
@@ -47,12 +49,15 @@ L'architettura segue un flusso non-distruttivo: i file originali non vengono mai
 ---
 
 #### **Modulo A: THE CLEANER — Deduplicatore Intelligente**
+
 *Eredità: TuneUp 3.0.2 + tuneup (Python → TS) + RuntimeAudioManagerPro (TS)*
 
 ##### Logica Core (da `gestore_duplicati_musicali.py` + `AnalysisOrchestrator.ts`)
+
 Il Cleaner orchestra una pipeline in 3 passi:
 
 **Passo 1 — Scansione Ricorsiva + Quarantena "Non-Conformi"**
+
 - Scansione stream-chunked / async per non saturare la RAM (architettura DB-First: ogni file trovato viene scritto su SQLite, non accumulato in RAM)
 - Formati audio riconosciuti: `.mp3`, `.flac`, `.wav`, `.m4a`, `.aac`, `.ogg`, `.wma`
 
@@ -61,7 +66,7 @@ Il Cleaner orchestra una pipeline in 3 passi:
 Il sistema identifica e isola automaticamente in `_NonConform/` i file che non appartengono a una libreria musicale pulita. Questo avviene **prima ancora della ricerca duplicati**:
 
 | Tipo | Metodo di Rilevamento | Esempi |
-|------|----------------------|--------|
+| :--- | :--- | :--- |
 | **Audio da Video YouTube** | Pattern regex sul nome file (indipendente dall'estensione — un `.mp3` estratto da YouTube viene comunque isolato) | `Song (Official Video).mp3`, `Artist - Title [Official Music Video].mp3`, `Track (Lyrics Video).flac`, `(Visualizer).mp3` |
 | **File video con estensione audio** | Hash/probe FFmpeg: il codec rilevato è video/misto, non audio puro | `.mp4`, `.mkv`, `.avi` rinominati in `.mp3` |
 | **Formati non supportati** | Estensione non nella lista allowed | `.wma` legacy, `.ra`, `.aif` non standard, file system temporanei |
@@ -79,25 +84,30 @@ I **pattern video** (configurabili dall'utente in `settings.json`) includono di 
 
 Inoltre il sistema rimuove da nomi e tag: URL junk (`www.`, `http`), track number iniziali (`01 -`, `02.`), simboli di copyright e caratteri non stampabili.
 
-**Passo 2 — Analisi Duplicati (triplice)**
+###### **Passo 2 — Analisi Duplicati (triplice)**
+
 - **Per Impronta Acustica (`fpcalc` / AcoustID)**: rileva brani identici anche se rinominati, ri-encodati o in formati diversi. Metodo più preciso.
 - **Per Metadati Normalizzati (Artista + Titolo)**: normalizzazione testo (lowercase, rimozione punteggiatura, `&→and`), confronto semantico.
 - **Per Versioni Alternative**: raggruppamento brani con stesso titolo base ma varianti (Radio Edit, Live, Remix, Instrumental, Remaster) — pattern configurabili via JSON.
 
-**Passo 3 — Selezione "Best-Pick" (Auto-Pick Gold)**
+###### **Passo 3 — Selezione "Best-Pick" (Auto-Pick Gold)**
+
 Algoritmo di selezione del file migliore (da `confronta_qualita()` — TuneUp):
+
 1. **Formato**: Lossless (.flac, .wav) > Lossy (.mp3, .aac, .ogg)
 2. **Bitrate** (differenza significativa > 32kbps vince): bitrate superiore preferito
 3. **Durata** (differenza > 5s): brano più lungo preferito (evita brani tronchi)
 4. **Dimensione file**: a parità di tutto il resto, il file più grande vince
 
-**Review UI** (da RuntimeAudioManagerPro):
+###### **Review UI** (da RuntimeAudioManagerPro)
+
 - Vista Master-Detail: lista gruppi duplicati a sinistra, dettaglio a destra
 - Visualizzazione **Cover Art reali** estratte dai tag ID3 (protocollo `thumb://` per streaming binario senza base64 overhead — lezione da RAMP v0.1.12)
 - Toggle interattivo "Forza come Migliore" — permette override manuale della decisione automatica
 - Paginazione/virtualizzazione obbligatoria (lezione da RAMP NUOVE_CRITICITA: 5000 img in DOM = crash GPU)
 
-**Sicurezza**:
+###### **Sicurezza**
+
 - Operazioni non-distruttive: duplicati → `_Duplicates/`; video/non conformi → `_NonConform/`; versioni alternative → `_ToVerify/`
 - Collision handler automatico su nomi file: aggiunge `_1`, `_2` ecc. se il file esiste già (bug documentato in RAMP ActionRunner)
 - Log dettagliato di ogni operazione
@@ -105,12 +115,15 @@ Algoritmo di selezione del file migliore (da `confronta_qualita()` — TuneUp):
 ---
 
 #### **Modulo B: THE CONFORMER — Standardizzatore Universale**
+
 *Eredità: LiquidSopaConformer (Python) + RuntimeAudioManagerPro `ConformerService.ts`*
 
 ##### Logica Core (da `conformer.py` + `ConformerService.ts`)
+
 Il Conformer è un motore di conversione/standardizzazione massiva basato su FFmpeg.
 
 **Funzionamento**:
+
 1. Scansiona la cartella input per trovare file audio
 2. Per ogni file: verifica se è già conforme al preset selezionato (check bitrate + sample_rate con tolleranza ±10kbps)
 3. Se conforme: copia sicura nella destinazione
@@ -121,7 +134,7 @@ Il Conformer è un motore di conversione/standardizzazione massiva basato su FFm
 **Preset Audio Disponibili** — Multi-preset (novità rispetto ai progetti precedenti):
 
 | ID Preset | Nome | Formato | Bitrate | Sample Rate | Canali | Target |
-|-----------|------|---------|---------|-------------|--------|--------|
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `PODCAST` | Podcast / Voce | MP3 CBR | 128 kbps | 44.1 kHz | Stereo | Podcast, voce, distribuzione web |
 | `RADIO_STD` | Radio Standard | MP3 CBR | 192 kbps | 44.1 kHz | Stereo | **Default radio** — Liquidsoap, Azuracast, Shoutcast, Icecast |
 | `RADIO_HQ` | Radio Alta Qualità | MP3 CBR | 256 kbps | 44.1 kHz | Stereo | Sistemi premium, MB STUDIO |
@@ -130,12 +143,14 @@ Il Conformer è un motore di conversione/standardizzazione massiva basato su FFm
 | `CUSTOM` | Personalizzato | Selezionabile | Configurabile | Configurabile | Configurabile | Utenti avanzati |
 
 **Opzioni aggiuntive** (toggle ON/OFF per ogni preset):
+
 - **Loudness Normalization EBU R128**: applica gain normalization (target -23 LUFS, max TP = -1 dBTP) tramite FFmpeg `loudnorm` filter — standard broadcasting europeo
 - **Silent Trimming**: rimozione silenzi iniziali/finali (threshold configurabile in dB, durata min in ms) — fondamentale per mixaggi automatici Liquidsoap
 - **Preservazione Struttura Cartelle**: mantiene la gerarchia originale delle directory nell'output
 - **Modalità In-Place**: sovrascrive i file originali (con backup opzionale) anziché creare una copia separata
 
 **FFmpeg Integration**:
+
 - Auto-detection FFmpeg nel sistema (PATH, WinGet paths, percorsi comuni)
 - In Tauri: binario FFmpeg incluso nel bundle o rilevato nel sistema
 - Elaborazione parallela worker-pool (N worker configurabile, default = CPU cores / 2)
@@ -144,34 +159,40 @@ Il Conformer è un motore di conversione/standardizzazione massiva basato su FFm
 ---
 
 #### **Modulo C: THE LIBRARIAN — Catalogo & Metadati**
+
 *Eredità: RuntimeAudioManagerPro `MetadataSanitizerService.ts` + LiquidSopaConformer (mutagen)*
 
 ##### Logica Core
+
 Il Librarian è il modulo di gestione intelligente dei tag e del catalogo interno SQLite.
 
 **Funzione 1 — Metadata Scrubbing (Pulizia ID3)**
+
 Tre livelli di pulizia selezionabili:
 
 | Livello | Nome | Cosa mantiene |
-|---------|------|---------------|
+| :--- | :--- | :--- |
 | `BROADCAST` | AzuraCast / Liquidsoap | Title, Artist, Album, Year, Genre, Cover Art |
 | `DJ_PROD` | DJ / Producer | Come Broadcast + BPM, Key (Tonalità), Publisher (Etichetta) |
 | `MINIMAL` | Pulizia Leggera | Rimuove solo commenti junk, URL nei tag, encoding inconsistente |
 
 Cosa rimuove in automatico (preset BROADCAST/DJ):
+
 - Commenti con URL (tipici dei download YouTube)
 - Tag proprietari di software DJ (Serato, Rekordbox, Traktor markup)
 - Encoding non-UTF8
 - Caratteri di controllo e junk data
 
-**Funzione 2 — Cover Art (Artwork)**
+###### **Funzione 2 — Cover Art (Artwork)**
+
 - **Estrazione**: lettura copertine embedded nei tag ID3/FLAC/M4A
 - **Visualizzazione**: preview nella UI durante review
 - **Injection massiva**: download e embedding automatico cover art mancanti (via MusicBrainz/Last.fm API o file locali selezionati)
 - **Fix formato**: conversione copertine in JPEG ottimizzato (max 500x500px per le copie embed, qualità 85%) per ridurre il gonfiore dei file MP3
 - **Verifica integrità**: flagging file senza copertina per revisione manuale
 
-**Funzione 3 — Catalogo SQLite**
+###### **Funzione 3 — Catalogo SQLite**
+
 - Indicizzazione locale ultra-veloce dell'intera libreria (basato su architettura DB-Driven di RAMP)
 - Schema tabelle: `library.db` con WAL mode + cache size configurata
   - `tracks`: path, artist, title, album, year, genre, bitrate, sample_rate, duration, file_size, fingerprint, cover_hash, scan_id, conforming_status
@@ -185,7 +206,7 @@ Cosa rimuove in automatico (preset BROADCAST/DJ):
 ### 🛠️ 5. Stack Tecnologico
 
 | Layer | Tecnologia | Note |
-|-------|-----------|------|
+| :--- | :--- | :--- |
 | **Backend Core** | **Rust (Tauri)** | File I/O, hashing SHA-256, processi FFmpeg, SQLite |
 | **Database** | **SQLite** (via `rusqlite`) | WAL mode, cache ottimizzata, FTS5 |
 | **Audio Engine** | **FFmpeg** (binario incluso) | Conversione, probe, loudnorm, silence detect |
@@ -225,7 +246,7 @@ Il design di riferimento è il sistema **"The Brutalist Control Room"** (Signal 
 Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono ripetersi**:
 
 | # | Problema Originale | Soluzione in SoundMaster Pro |
-|---|-------------------|------------------------------|
+| :--- | :--- | :--- |
 | 1 | OOM su librerie >50.000 file (array RAM) | Architettura DB-First fin dal giorno 1. Nessun array massivo in memoria. |
 | 2 | SQLite SQLITE_BUSY in scritture concorrenti | WAL mode attivata al primo `init()`, obbligatoriamente. |
 | 3 | Sovrascrittura silente di file con stesso nome | Collision handler universale su tutte le operazioni fisiche (copia, sposta, trascodifica). |
@@ -241,7 +262,7 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 
 > **Aggiornamento al 2026-04-04 — v0.5.10**: Le fasi 0, 1 e 2 sono completate con ciclo esteso di fix post-test reale. Vedere `docs/CHANGELOG.md` per il dettaglio di ogni versione rilasciata.
 
-#### Fase 0 — Setup Ambiente ✅ _Completata: 2026-03-31 — v0.0.1_
+#### Fase 0 — Setup Ambiente ✅ *Completata: 2026-03-31 — v0.0.1*
 
 - [x] Inizializzazione progetto Tauri (Rust + React 19 + TS + Tailwind 4)
 - [x] Configurazione build pipeline (Windows target principale, macOS/Linux secondari)
@@ -249,7 +270,7 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 - [x] Integrazione FFmpeg (auto-detection + bundle)
 - [x] Integrazione fpcalc (bundle incluso)
 
-#### Fase 1 — Hub UI & Design System ✅ _Completata: 2026-04-03 — v0.2.0_
+#### Fase 1 — Hub UI & Design System ✅ *Completata: 2026-04-03 — v0.2.0*
 
 > Nota: il design system "Brutalist Control Room" (verde `#39FF14`) è stato sostituito in v0.2.0 da "Industrial" (ambra `#FFB300` + ciano `#A4E7FF`). Il documento `PROTOTIPO-INTERFACCIA/signal_kombinat/DESIGN.md` è un riferimento storico.
 
@@ -296,7 +317,7 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 - [x] Guardia workspace = destinazione: rifiuto + log error (v0.5.10)
 - [x] Badge `AUTO — subfolder of source` su destinazioni automatiche (v0.5.10)
 
-#### Fase 3 — The Conformer (Modulo B) — _In sviluppo: v0.6.0+_
+#### Fase 3 — The Conformer (Modulo B) — *In sviluppo: v0.6.0+*
 
 - [ ] `conformer.rs` (Rust): pipeline FFmpeg con preset (PODCAST / RADIO_STD / RADIO_HQ / MASTER / LOSSLESS_NORM)
 - [ ] Loudness normalization EBU R128 via FFmpeg `loudnorm` (2-pass)
@@ -305,7 +326,7 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 - [ ] Progress streaming via eventi Tauri
 - [ ] ConformerModule: collegamento UI preset selector + file queue + progress per-file
 
-#### Fase 4 — The Librarian (Modulo C) — _Pianificata: v0.7.0+_
+#### Fase 4 — The Librarian (Modulo C) — *Pianificata: v0.7.0+*
 
 - [ ] `metadata.rs` (Rust/lofty-rs): read/write tag ID3/FLAC/M4A
 - [ ] `artwork.rs` (Rust): estrazione, resize (max 500×500px JPEG), injection massiva
@@ -329,7 +350,7 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 I seguenti progetti locali sono stati analizzati come base di conoscenza per la stesura di questo piano. Contengono logiche, algoritmi e architetture da cui SoundMaster Pro trae ispirazione, pur essendo sviluppi precedenti con qualità tecnica e architetturale inferiore a quella target di questo progetto definitivo:
 
 | Fonte | Percorso Locale | Contributo Principale |
-|-------|----------------|----------------------|
+| :--- | :--- | :--- |
 | **TuneUp 3.0.2** *(eseguibile stabile)* | [C:\Users\Utente\Documents\SVILUPPO\UTILITY\TuneUp 3.0.2](file:///C:/Users/Utente/Documents/SVILUPPO/UTILITY/TuneUp%203.0.2) | Versione distribuita finale, comportamento atteso, config JSON |
 | **tuneup** *(sorgente GitHub)* | [C:\Users\Utente\Documents\GitHub\tuneup](file:///C:/Users/Utente/Documents/GitHub/tuneup) | `gestore_duplicati_musicali.py`: algoritmo best-pick, pipeline duplicati, pattern video/versioni, normalizzazione testo |
 | **LiquidSopaConformer** *(sorgente GitHub)* | [C:\Users\Utente\Documents\GitHub\LiquidSopaConformer](file:///C:/Users/Utente/Documents/GitHub/LiquidSopaConformer) | `conformer.py`: pipeline FFmpeg, auto-detection FFmpeg, gestione preset, elaborazione sequenziale |
