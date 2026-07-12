@@ -9,7 +9,9 @@
 /// - Aggiornamento `conforming_status = 'non_conform'` nel DB
 
 use crate::logger;
-use crate::utils::{canonical_or_raw, collision_safe_path, hidden_command, workspace_like_prefix};
+use crate::utils::{
+    canonical_or_raw, collision_safe_path, hidden_command, move_file, workspace_like_prefix,
+};
 use regex::Regex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -613,7 +615,8 @@ fn quarantine_non_conform_impl(
                 // Path di destinazione — collision-safe
                 let dest = collision_safe_path(&quarantine_dir, &filename);
 
-                match std::fs::rename(src, &dest) {
+                // move_file: rename + fallback copy+delete cross-volume (fix v0.5.14)
+                match move_file(src, &dest) {
                     Ok(_) => {
                         moved += 1;
                         logger::log_detail(

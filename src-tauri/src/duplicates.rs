@@ -10,7 +10,9 @@
 /// - Aggiornamento `conforming_status = 'duplicate'` nel DB per i loser
 
 use crate::logger;
-use crate::utils::{canonical_or_raw, collision_safe_path, hidden_command, workspace_like_prefix};
+use crate::utils::{
+    canonical_or_raw, collision_safe_path, hidden_command, move_file, workspace_like_prefix,
+};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -668,7 +670,8 @@ fn resolve_duplicates_impl(
                     }
 
                     let dest = collision_safe_path(&quarantine_dir, &filename);
-                    match std::fs::rename(src, &dest) {
+                    // move_file: rename + fallback copy+delete cross-volume (fix v0.5.14)
+                    match move_file(src, &dest) {
                         Ok(_) => {
                             moved += 1;
                             logger::log_detail(

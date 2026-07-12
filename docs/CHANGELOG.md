@@ -6,6 +6,16 @@ Indice di tutte le versioni rilasciate. Ogni versione ha il proprio documento de
 
 ## Versioni
 
+### v0.5.14 — Cross-Drive Move Fallback
+
+> 2026-07-12 · Fix grave — criticità 9 dell'audit
+
+**Bug**: `fs::rename` fallisce tra volumi diversi — con destinazione custom su un altro drive (es. workspace `K:\`, destinazione `C:\`) ogni move di quarantena/resolve falliva. **Fix**: helper `move_file` — rename atomico quando possibile, fallback copy+delete cross-volume con pulizia in caso di errore parziale (mai due copie residue).
+
+[Dettaglio completo](log/0.5.14.md)
+
+---
+
 ### v0.5.13 — Workspace Switch Safety + Per-Group Resolve
 
 > 2026-07-12 · Fix gravi data-safety frontend — criticità 6, 8, 15 dell'audit

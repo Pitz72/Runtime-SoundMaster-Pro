@@ -45,6 +45,29 @@ pub fn canonical_or_raw(p: &Path) -> PathBuf {
     std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
 }
 
+/// Sposta un file in modo affidabile anche tra volumi diversi.
+///
+/// # Fix v0.5.14 (criticità 9 — audit 12/07/2026)
+/// `fs::rename` fallisce se sorgente e destinazione sono su volumi diversi
+/// (Windows: ERROR_NOT_SAME_DEVICE). Caso tipico: workspace su `K:\` e
+/// destinazione quarantena custom su `C:\` — ogni singolo move falliva con
+/// errore OS criptico. Qui si tenta prima il rename (atomico, istantaneo,
+/// stesso volume); se fallisce si ripiega su copy + delete dell'originale.
+/// Se la delete dell'originale fallisce, la copia appena creata viene rimossa
+/// per non lasciare il file duplicato su due volumi.
+pub fn move_file(src: &Path, dest: &Path) -> std::io::Result<()> {
+    if std::fs::rename(src, dest).is_ok() {
+        return Ok(());
+    }
+    // Fallback cross-volume: copia + cancella l'originale
+    std::fs::copy(src, dest)?;
+    if let Err(e) = std::fs::remove_file(src) {
+        let _ = std::fs::remove_file(dest);
+        return Err(e);
+    }
+    Ok(())
+}
+
 /// Crea un `Command` che su Windows NON apre una finestra console.
 ///
 /// # Fix v0.5.12 (criticità 5 — audit 12/07/2026)
@@ -71,6 +94,31 @@ pub fn hidden_command<S: AsRef<std::ffi::OsStr>>(program: S) -> std::process::Co
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn move_file_moves_within_same_volume() {
+        let dir = std::env::temp_dir().join("smp_test_move_same");
+        let sub = dir.join("dest");
+        std::fs::create_dir_all(&sub).unwrap();
+        let src = dir.join("a.txt");
+        std::fs::write(&src, b"hello").unwrap();
+        let dest = sub.join("a.txt");
+        move_file(&src, &dest).unwrap();
+        assert!(!src.exists());
+        assert_eq!(std::fs::read(&dest).unwrap(), b"hello");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn move_file_fails_cleanly_on_missing_source() {
+        let dir = std::env::temp_dir().join("smp_test_move_missing");
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("nonexistent.txt");
+        let dest = dir.join("out.txt");
+        assert!(move_file(&src, &dest).is_err());
+        assert!(!dest.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn like_prefix_appends_separator() {
