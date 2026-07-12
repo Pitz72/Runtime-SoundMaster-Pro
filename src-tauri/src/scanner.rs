@@ -1,5 +1,5 @@
 /// scanner.rs — Scansione ricorsiva workspace audio
-/// Runtime SoundMaster Pro — v0.5.9
+/// Runtime SoundMaster Pro — v0.5.11
 ///
 /// Responsabilità:
 /// - Scansione ricorsiva della cartella workspace
@@ -18,9 +18,10 @@
 /// Le cartelle _NonConform e _Duplicates vengono escluse dal WalkDir.
 
 use crate::logger;
+use crate::utils::workspace_like_prefix;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::Emitter;
 use tauri::Manager;
 use walkdir::WalkDir;
@@ -72,19 +73,65 @@ fn scan_workspace_impl(
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
         .map_err(|e| format!("Scanner: PRAGMA failed: {e}"))?;
 
-    // ── Isolamento scansione (fix v0.5.7) ───────────────────────────────────
-    // Reset conforming_status = 'unknown' per tutti i track del workspace.
-    // Questo garantisce che ogni nuova scansione parta da uno stato pulito:
-    // - I risultati di detection precedenti non "inquinano" la nuova run
-    // - detect_non_conform e detect_duplicates analizzano tutto da capo
-    //
-    // Usa LIKE '<workspace>%' per coprire tutti i path sotto il workspace,
-    // inclusi i file precedentemente spostati in _NonConform/_Duplicates
-    // (il cui path nel DB è stato aggiornato alla nuova posizione).
+    // Pattern LIKE sicuro: wildcard escapate + separatore finale (fix v0.5.11)
+    let like_pattern = workspace_like_prefix(&workspace_path);
+
+    // ── Purga record orfani (fix v0.5.11) ───────────────────────────────────
+    // File presenti nel DB ma non più su disco (cancellati, spostati o
+    // rinominati fuori dall'app). Senza questa purga i record fantasma
+    // venivano resettati a 'unknown' e detect_non_conform li flaggava come
+    // falsi "corrupt" (ffprobe fallisce su path inesistenti).
+    // La purga è limitata al workspace corrente: record di altri workspace
+    // (potenzialmente su drive non montati) non vengono toccati.
+    let mut orphan_ids: Vec<i64> = Vec::new();
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, path FROM tracks WHERE path LIKE ?1 ESCAPE '!'")
+            .map_err(|e| format!("Scanner: orphan query failed: {e}"))?;
+        let rows = stmt
+            .query_map([&like_pattern], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| format!("Scanner: orphan query failed: {e}"))?;
+        for (id, path) in rows.filter_map(|r| r.ok()) {
+            if !Path::new(&path).exists() {
+                orphan_ids.push(id);
+            }
+        }
+    }
+    if !orphan_ids.is_empty() {
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Scanner: purge transaction failed: {e}"))?;
+        for id in &orphan_ids {
+            let _ = tx.execute("DELETE FROM tracks WHERE id = ?1", [id]);
+        }
+        tx.commit()
+            .map_err(|e| format!("Scanner: purge commit failed: {e}"))?;
+        logger::log_detail(
+            "SCANNER",
+            &format!(
+                "Purgati {} record orfani (file non più presenti su disco)",
+                orphan_ids.len()
+            ),
+        );
+    }
+
+    // ── Isolamento scansione (fix v0.5.7, rivisto in v0.5.11) ────────────────
+    // Reset conforming_status = 'unknown' per i track del workspace NON in
+    // quarantena. I record con status 'non_conform'/'duplicate' (file già
+    // spostati in _NonConform/_Duplicates) mantengono il loro stato: il reset
+    // indiscriminato li reimmetteva nel ciclo di detection e la ri-quarantena
+    // li rinominava in place con suffisso _1 (collisione con se stessi).
+    // Se l'utente ripristina manualmente un file dalla quarantena, il vecchio
+    // record viene eliminato dalla purga orfani qui sopra e il file viene
+    // re-indicizzato come nuovo al pass 2.
     let reset_count = conn
         .execute(
-            "UPDATE tracks SET conforming_status = 'unknown' WHERE path LIKE ?1",
-            [format!("{}%", workspace_path)],
+            "UPDATE tracks SET conforming_status = 'unknown' \
+             WHERE path LIKE ?1 ESCAPE '!' \
+             AND conforming_status NOT IN ('non_conform', 'duplicate')",
+            [&like_pattern],
         )
         .unwrap_or(0);
 

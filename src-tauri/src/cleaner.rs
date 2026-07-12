@@ -1,5 +1,5 @@
 /// cleaner.rs — The Cleaner: Non-Conform Detection & Quarantine
-/// Runtime SoundMaster Pro — v0.5.10
+/// Runtime SoundMaster Pro — v0.5.11
 ///
 /// Responsabilità:
 /// - Rilevamento file non-conformi tramite regex su filename (pattern YouTube/video-rip)
@@ -9,7 +9,7 @@
 /// - Aggiornamento `conforming_status = 'non_conform'` nel DB
 
 use crate::logger;
-use crate::utils::collision_safe_path;
+use crate::utils::{canonical_or_raw, collision_safe_path, workspace_like_prefix};
 use regex::Regex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -319,6 +319,7 @@ fn probe_file(path: &str, ffprobe_path: &str) -> (bool, Option<f64>, Option<Stri
 
 fn detect_non_conform_impl(
     app: tauri::AppHandle,
+    workspace_path: String,
     ffprobe_path: Option<String>,
 ) -> Result<CleanerResult, String> {
     let data_dir = app
@@ -329,11 +330,16 @@ fn detect_non_conform_impl(
     let conn = Connection::open(data_dir.join("library.db"))
         .map_err(|e| format!("Cannot open DB: {e}"))?;
 
-    // Legge solo i track con stato 'unknown' — già indicizzati ma non ancora analizzati
+    // Legge solo i track con stato 'unknown' DEL WORKSPACE CORRENTE.
+    // Fix v0.5.11 (DB multi-workspace): senza il filtro sul path, la query
+    // includeva i track di ogni workspace mai scansionato — e la quarantena
+    // spostava file di altri workspace dentro _NonConform del corrente.
+    let like_pattern = workspace_like_prefix(&workspace_path);
     let mut stmt = conn
         .prepare(
             "SELECT id, path, filename, COALESCE(file_size_bytes, 0) \
-             FROM tracks WHERE conforming_status = 'unknown' ORDER BY id",
+             FROM tracks WHERE conforming_status = 'unknown' \
+             AND path LIKE ?1 ESCAPE '!' ORDER BY id",
         )
         .map_err(|e| format!("DB prepare failed: {e}"))?;
 
@@ -345,7 +351,7 @@ fn detect_non_conform_impl(
     }
 
     let tracks: Vec<TrackRow> = stmt
-        .query_map([], |row| {
+        .query_map([&like_pattern], |row| {
             Ok(TrackRow {
                 id: row.get(0)?,
                 path: row.get(1)?,
@@ -531,6 +537,27 @@ fn quarantine_non_conform_impl(
     std::fs::create_dir_all(&quarantine_dir)
         .map_err(|e| format!("Cannot create quarantine dir: {e}"))?;
 
+    // ── Guardia backend destinazione = workspace (fix v0.5.11) ──────────────
+    // Difesa in profondità per l'incidente Genesis: il check frontend
+    // (`selected === workspacePath`) è un confronto testuale bypassabile su
+    // Windows da differenze di maiuscole o separatori finali. Qui il confronto
+    // avviene su path canonicalizzati: se la destinazione coincide con il
+    // workspace, i file verrebbero rinominati in place con suffisso _1 invece
+    // di essere spostati.
+    let ws_canon = canonical_or_raw(Path::new(&workspace_path));
+    let quarantine_canon = canonical_or_raw(&quarantine_dir);
+    if quarantine_canon == ws_canon {
+        logger::log_detail(
+            "CLEANER",
+            "BLOCCATO: destinazione quarantena coincide con il workspace sorgente",
+        );
+        return Err(
+            "Destinazione non valida: coincide con il workspace sorgente. \
+             I file verrebbero rinominati in place invece che spostati."
+                .to_string(),
+        );
+    }
+
     let mut moved = 0u64;
     let mut failed = 0u64;
 
@@ -561,6 +588,21 @@ fn quarantine_non_conform_impl(
 
                 // File già spostato o eliminato — aggiorna solo il DB
                 if !src.exists() {
+                    let _ = conn.execute(
+                        "UPDATE tracks SET conforming_status='non_conform' WHERE id=?1",
+                        [id],
+                    );
+                    continue;
+                }
+
+                // Guardia per-file (fix v0.5.11): se il file è GIÀ dentro la
+                // cartella di quarantena, il rename lo rinominerebbe in place
+                // con _1 (collisione con se stesso). Aggiorna solo lo status.
+                let already_in_quarantine = src
+                    .parent()
+                    .map(|p| canonical_or_raw(p) == quarantine_canon)
+                    .unwrap_or(false);
+                if already_in_quarantine {
                     let _ = conn.execute(
                         "UPDATE tracks SET conforming_status='non_conform' WHERE id=?1",
                         [id],
@@ -607,17 +649,22 @@ fn quarantine_non_conform_impl(
 
 // ── Comandi Tauri pubblici ───────────────────────────────────────────────────
 
-/// Analizza i track con `conforming_status = 'unknown'` nel DB.
+/// Analizza i track con `conforming_status = 'unknown'` del workspace corrente.
 /// Emette eventi `"cleaner-progress"` durante l'esecuzione.
+/// Parametro `workspace_path`: workspace corrente — limita l'analisi ai suoi file
+/// (fix v0.5.11 — DB multi-workspace).
 /// Parametro `ffprobe_path`: path a ffprobe (o `null` per skip FFprobe checks).
 #[tauri::command]
 pub async fn detect_non_conform(
     app: tauri::AppHandle,
+    workspace_path: String,
     ffprobe_path: Option<String>,
 ) -> Result<CleanerResult, String> {
-    tokio::task::spawn_blocking(move || detect_non_conform_impl(app, ffprobe_path))
-        .await
-        .map_err(|e| format!("Task join error: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        detect_non_conform_impl(app, workspace_path, ffprobe_path)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {e}"))?
 }
 
 /// Sposta i file identificati come non-conformi nella cartella di quarantena.

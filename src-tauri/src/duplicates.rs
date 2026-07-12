@@ -1,5 +1,5 @@
 /// duplicates.rs — The Cleaner: Duplicate Detection & Resolution
-/// Runtime SoundMaster Pro — v0.5.9
+/// Runtime SoundMaster Pro — v0.5.11
 ///
 /// Responsabilità:
 /// - Phase 1 "binary": SHA-256 su file della stessa dimensione → duplicati esatti
@@ -10,7 +10,7 @@
 /// - Aggiornamento `conforming_status = 'duplicate'` nel DB per i loser
 
 use crate::logger;
-use crate::utils::collision_safe_path;
+use crate::utils::{canonical_or_raw, collision_safe_path, workspace_like_prefix};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -251,6 +251,7 @@ fn run_fpcalc(path: &str, fpcalc_bin: &str) -> Option<(String, f64)> {
 
 fn detect_duplicates_impl(
     app: tauri::AppHandle,
+    workspace_path: String,
     fpcalc_path: Option<String>,
 ) -> Result<DuplicateDetectResult, String> {
     let data_dir = app
@@ -261,27 +262,30 @@ fn detect_duplicates_impl(
     let conn = Connection::open(data_dir.join("library.db"))
         .map_err(|e| format!("Cannot open DB: {e}"))?;
 
-    // Legge solo i track non ancora flaggati come problematici.
+    // Legge solo i track non ancora flaggati come problematici, e solo quelli
+    // DEL WORKSPACE CORRENTE.
     // FIX G2 (v0.5.4): la query originale escludeva solo 'non_conform', il che
     // includeva i file con conforming_status='duplicate' (già spostati in
     // _Duplicates/ e con path aggiornato nel DB). Su una seconda esecuzione,
     // detect_duplicates li ri-raggruppava e resolve_duplicates li spostava di
     // nuovo (_duplicate → _duplicate_1, ecc.) in loop infinito.
-    // La query corretta esclude sia 'non_conform' che 'duplicate': analizza
-    // solo file 'unknown' (non ancora analizzati) e 'ok' (puliti, ma
-    // potenzialmente duplicati di file appena aggiunti).
+    // FIX v0.5.11 (DB multi-workspace): senza il filtro sul path, la query
+    // includeva i track di ogni workspace mai scansionato — conteggi gonfiati
+    // e resolve che spostava file di altri workspace nel corrente.
+    let like_pattern = workspace_like_prefix(&workspace_path);
     let mut stmt = conn
         .prepare(
             "SELECT id, path, filename, artist, title, bitrate, duration_secs, \
              COALESCE(file_size_bytes, 0), format \
              FROM tracks \
              WHERE conforming_status NOT IN ('non_conform', 'duplicate') \
+             AND path LIKE ?1 ESCAPE '!' \
              ORDER BY id",
         )
         .map_err(|e| format!("DB prepare failed: {e}"))?;
 
     let tracks: Vec<TrackRow> = stmt
-        .query_map([], |row| {
+        .query_map([&like_pattern], |row| {
             Ok(TrackRow {
                 id: row.get(0)?,
                 path: row.get(1)?,
@@ -592,6 +596,25 @@ fn resolve_duplicates_impl(
     std::fs::create_dir_all(&quarantine_dir)
         .map_err(|e| format!("Cannot create duplicates dir: {e}"))?;
 
+    // ── Guardia backend destinazione = workspace (fix v0.5.11) ──────────────
+    // Difesa in profondità per l'incidente Genesis (419 file rinominati _1 in
+    // place): il check frontend è un confronto testuale bypassabile su Windows
+    // da differenze di maiuscole o separatori finali. Confronto su path
+    // canonicalizzati.
+    let ws_canon = canonical_or_raw(Path::new(&workspace_path));
+    let quarantine_canon = canonical_or_raw(&quarantine_dir);
+    if quarantine_canon == ws_canon {
+        logger::log_detail(
+            "DUPLICATES",
+            "BLOCCATO: destinazione duplicati coincide con il workspace sorgente",
+        );
+        return Err(
+            "Destinazione non valida: coincide con il workspace sorgente. \
+             I file verrebbero rinominati in place invece che spostati."
+                .to_string(),
+        );
+    }
+
     let mut moved = 0u64;
     let mut failed = 0u64;
 
@@ -622,6 +645,21 @@ fn resolve_duplicates_impl(
                     let src = Path::new(&src_path);
                     if !src.exists() {
                         // Già spostato — aggiorna solo status
+                        let _ = conn.execute(
+                            "UPDATE tracks SET conforming_status='duplicate' WHERE id=?1",
+                            [id],
+                        );
+                        continue;
+                    }
+
+                    // Guardia per-file (fix v0.5.11): file già dentro la
+                    // cartella duplicati — il rename lo rinominerebbe in place
+                    // con _1. Aggiorna solo lo status.
+                    let already_in_quarantine = src
+                        .parent()
+                        .map(|p| canonical_or_raw(p) == quarantine_canon)
+                        .unwrap_or(false);
+                    if already_in_quarantine {
                         let _ = conn.execute(
                             "UPDATE tracks SET conforming_status='duplicate' WHERE id=?1",
                             [id],
@@ -667,17 +705,22 @@ fn resolve_duplicates_impl(
 
 // ── Comandi Tauri pubblici ───────────────────────────────────────────────────
 
-/// Analizza i track nella libreria per trovare duplicati.
+/// Analizza i track del workspace corrente per trovare duplicati.
 /// Emette eventi `"duplicate-progress"` durante l'esecuzione.
+/// `workspace_path`: workspace corrente — limita l'analisi ai suoi file
+/// (fix v0.5.11 — DB multi-workspace).
 /// `fpcalc_path`: path a fpcalc (o `null` per saltare il fingerprinting acustico).
 #[tauri::command]
 pub async fn detect_duplicates(
     app: tauri::AppHandle,
+    workspace_path: String,
     fpcalc_path: Option<String>,
 ) -> Result<DuplicateDetectResult, String> {
-    tokio::task::spawn_blocking(move || detect_duplicates_impl(app, fpcalc_path))
-        .await
-        .map_err(|e| format!("Task join error: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        detect_duplicates_impl(app, workspace_path, fpcalc_path)
+    })
+    .await
+    .map_err(|e| format!("Task join error: {e}"))?
 }
 
 /// Sposta i file loser in `<workspace>/_Duplicates/`.

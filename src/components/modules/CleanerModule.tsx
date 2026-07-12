@@ -226,7 +226,8 @@ export function CleanerModule() {
     setNcQuarantineResult(null);
     addLog('info', 'The Cleaner: starting non-conform analysis...', workspacePath);
     try {
-      const result = await invoke<CleanerResult>('detect_non_conform', { ffprobePath });
+      // workspacePath limita l'analisi al workspace corrente (fix v0.5.11 — DB multi-workspace)
+      const result = await invoke<CleanerResult>('detect_non_conform', { workspacePath, ffprobePath });
       setNcTotalAnalyzed(result.total_analyzed);
       setNonConformItems(result.items);
       setIsCleanerRunning(false);
@@ -302,7 +303,9 @@ export function CleanerModule() {
     setSelectedGroupId(null);
     addLog('info', 'The Cleaner: starting duplicate analysis...', workspacePath);
     try {
+      // workspacePath limita l'analisi al workspace corrente (fix v0.5.11 — DB multi-workspace)
       const result = await invoke<DuplicateDetectResult>('detect_duplicates', {
+        workspacePath,
         fpcalcPath: fpcalcPath ?? null,
       });
       setDuplicateGroups(result.groups);

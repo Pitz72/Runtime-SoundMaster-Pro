@@ -6,6 +6,16 @@ Indice di tutte le versioni rilasciate. Ogni versione ha il proprio documento de
 
 ## Versioni
 
+### v0.5.11 — Workspace Isolation Radicale + Guardie Backend
+
+> 2026-07-12 · Fix critici data-safety — esito audit completo riga-per-riga
+
+**DB multi-workspace**: `detect_non_conform` e `detect_duplicates` ora filtrano per workspace corrente — mai più risultati (e spostamenti file!) contaminati da altri workspace. **Guardia backend Genesis**: destinazione == workspace rifiutata in Rust su path canonicalizzati (il check frontend era bypassabile da maiuscole/separatori su Windows); guardia per-file contro rename in place `_1`. **Quarantena stabile**: il rescan non resetta più i record in `_NonConform`/`_Duplicates` — eliminato il loop di ri-quarantena tra sessioni. **Purga orfani**: i record di file non più su disco vengono eliminati a ogni scan — eliminati i falsi "corrupt" su path inesistenti. **LIKE sicuro**: wildcard `%`/`_` escapate + separatore finale nel prefisso (helper `workspace_like_prefix` con 5 unit test).
+
+[Dettaglio completo](log/0.5.11.md)
+
+---
+
 ### v0.5.10 — Destination Clarity + Workspace Guard
 
 > 2026-04-04 · Fix UX critico — prevenzione perdita dati

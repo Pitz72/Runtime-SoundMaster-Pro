@@ -1,5 +1,5 @@
 /// lib.rs — Entry point Tauri
-/// Runtime SoundMaster Pro — v0.5.10
+/// Runtime SoundMaster Pro — v0.5.11
 
 mod cleaner;
 mod db;
