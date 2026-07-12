@@ -36,8 +36,9 @@ export function SettingsModule() {
     try {
       const selected = await open({ directory: true, multiple: false, title: 'Select default workspace' });
       if (selected && !Array.isArray(selected)) {
-        setWorkspacePath(selected);
+        setWorkspacePath(selected);  // resetta anche i risultati detection nello store (v0.5.13)
         addLog('success', 'Default workspace updated.', selected);
+        addLog('info', 'Detection results were reset. Run a scan from the Hub or Cleaner to index this workspace.');
       }
     } catch (err) {
       addLog('error', 'Workspace selection failed', String(err));

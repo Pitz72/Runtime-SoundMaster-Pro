@@ -6,6 +6,16 @@ Indice di tutte le versioni rilasciate. Ogni versione ha il proprio documento de
 
 ## Versioni
 
+### v0.5.13 — Workspace Switch Safety + Per-Group Resolve
+
+> 2026-07-12 · Fix gravi data-safety frontend — criticità 6, 8, 15 dell'audit
+
+**Cambio workspace sicuro**: lo store resetta i risultati di detection al cambio workspace — mai più Resolve eseguito con i gruppi del workspace precedente. **Resolve per-gruppo**: checkbox su ogni gruppo duplicati (default incluso), Select/Deselect All, conteggio "N of M groups" — i gruppi non revisionati possono essere esclusi. **Guardia destinazione robusta**: confronto normalizzato (case/separatori) e blocco delle cartelle custom dentro il workspace (verrebbero re-indicizzate al prossimo scan).
+
+[Dettaglio completo](log/0.5.13.md)
+
+---
+
 ### v0.5.12 — CREATE_NO_WINDOW: Stop ai Flash di Console in Release
 
 > 2026-07-12 · Fix grave UX release-only — criticità 5 dell'audit

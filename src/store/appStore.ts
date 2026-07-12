@@ -260,6 +260,14 @@ export const useAppStore = create<AppState>((set) => ({
       };
       return {
         workspacePath: path,
+        // Fix v0.5.13 (criticità 6): cambiare workspace invalida i risultati
+        // di detection in memoria. Senza questo reset era possibile eseguire
+        // Resolve/Quarantine con i gruppi del workspace precedente, spostando
+        // file del vecchio workspace nella quarantena del nuovo.
+        nonConformItems: [],
+        duplicateGroups: [],
+        cleanerProgress: null,
+        duplicateProgress: null,
         logs: [...state.logs, entry].slice(-200),
       };
     }),

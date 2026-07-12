@@ -35,6 +35,14 @@ function formatDuration(secs: number | null): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// Normalizza un path per confronti di uguaglianza: rimuove separatori finali
+// e ignora le maiuscole (i filesystem Windows sono case-insensitive).
+// Fix v0.5.13 (criticità 15): il confronto testuale esatto era bypassabile.
+// La guardia autoritativa resta comunque nel backend Rust (path canonicalizzati).
+function normalizePath(p: string): string {
+  return p.replace(/[\\/]+$/, '').toLowerCase();
+}
+
 // ── Badge ragione non-conform ──────────────────────────────────────────────
 
 function ReasonBadge({ reason }: { reason: string }) {
@@ -135,6 +143,9 @@ export function CleanerModule() {
   // overrides: { group_id → keep_id } — per default è best_pick_id
   const [keepOverrides, setKeepOverrides] = useState<Record<string, number>>({});
   const [dupResolveResult, setDupResolveResult] = useState<DuplicateResolveResult | null>(null);
+  // Fix v0.5.13 (criticità 8): gruppi esclusi dal resolve. Prima il resolve
+  // spostava i loser di TUTTI i gruppi, anche quelli mai aperti in review.
+  const [excludedGroupIds, setExcludedGroupIds] = useState<Set<string>>(new Set());
 
   const ffprobePath = systemStatus.ffprobePath;
   const fpcalcPath = systemStatus.fpcalcPath;
@@ -156,9 +167,13 @@ export function CleanerModule() {
         title: 'Select your audio library folder',
       });
       if (selected && !Array.isArray(selected)) {
-        setWorkspacePath(selected);
+        setWorkspacePath(selected);  // resetta anche i risultati detection nello store (v0.5.13)
         setCustomNcDest(null);  // reset destinazioni custom al cambio workspace
         setCustomDupDest(null);
+        // Reset step e stato locale di entrambi i flussi (v0.5.13 — criticità 6)
+        setNcStep(1); setNcSelectedIds(new Set()); setNcQuarantineResult(null); setNcTotalAnalyzed(0);
+        setDupStep(1); setKeepOverrides({}); setDupResolveResult(null);
+        setSelectedGroupId(null); setExcludedGroupIds(new Set());
         setIsScanning(true);
         addLog('info', 'Starting library scan...', selected);
         const result = await invoke<ScanResult>('scan_workspace', { path: selected });
@@ -177,11 +192,31 @@ export function CleanerModule() {
     }
   };
 
+  // Valida una destinazione custom contro il workspace corrente.
+  // Restituisce il messaggio d'errore, o null se la destinazione è valida.
+  // Fix v0.5.13 (criticità 15): confronto normalizzato (case/separatori) e
+  // blocco delle cartelle custom DENTRO il workspace (verrebbero re-indicizzate
+  // al prossimo scan), eccetto le due cartelle riservate di quarantena.
+  const validateDestination = (selected: string): string | null => {
+    if (!workspacePath) return null;
+    const ws = normalizePath(workspacePath);
+    const sel = normalizePath(selected);
+    if (sel === ws) {
+      return 'Invalid destination: cannot use the source workspace as destination. A subfolder will be created automatically.';
+    }
+    const sep = workspacePath.includes('\\') ? '\\' : '/';
+    if (sel.startsWith(ws + sep) && !/[\\/](_nonconform|_duplicates)$/.test(sel)) {
+      return 'Invalid destination: a custom folder inside the source workspace would be re-indexed on the next scan. Choose a folder outside the workspace.';
+    }
+    return null;
+  };
+
   const handleBrowseNcDest = async () => {
     const selected = await open({ directory: true, multiple: false, title: 'Select Non-Conform destination folder' });
     if (selected && !Array.isArray(selected)) {
-      if (selected === workspacePath) {
-        addLog('error', 'Invalid destination: cannot use the source workspace as destination. A subfolder will be created automatically.');
+      const error = validateDestination(selected);
+      if (error) {
+        addLog('error', error);
         return;
       }
       setCustomNcDest(selected);
@@ -191,8 +226,9 @@ export function CleanerModule() {
   const handleBrowseDupDest = async () => {
     const selected = await open({ directory: true, multiple: false, title: 'Select Duplicates destination folder' });
     if (selected && !Array.isArray(selected)) {
-      if (selected === workspacePath) {
-        addLog('error', 'Invalid destination: cannot use the source workspace as destination. A subfolder will be created automatically.');
+      const error = validateDestination(selected);
+      if (error) {
+        addLog('error', error);
         return;
       }
       setCustomDupDest(selected);
@@ -301,6 +337,7 @@ export function CleanerModule() {
     setKeepOverrides({});
     setDupResolveResult(null);
     setSelectedGroupId(null);
+    setExcludedGroupIds(new Set());
     addLog('info', 'The Cleaner: starting duplicate analysis...', workspacePath);
     try {
       // workspacePath limita l'analisi al workspace corrente (fix v0.5.11 — DB multi-workspace)
@@ -332,14 +369,25 @@ export function CleanerModule() {
     setKeepOverrides(prev => ({ ...prev, [groupId]: fileId }));
   };
 
+  const toggleGroupExcluded = (groupId: string) => {
+    setExcludedGroupIds(prev => {
+      const next = new Set(prev);
+      next.has(groupId) ? next.delete(groupId) : next.add(groupId);
+      return next;
+    });
+  };
+
+  // Solo i gruppi inclusi (checkbox attiva) entrano nel resolve (v0.5.13)
+  const includedGroups = duplicateGroups.filter(g => !excludedGroupIds.has(g.group_id));
+
   const handleDupResolve = async () => {
-    if (!workspacePath || duplicateGroups.length === 0) return;
-    const resolutions: [number, number[]][] = duplicateGroups.map(g => {
+    if (!workspacePath || includedGroups.length === 0) return;
+    const resolutions: [number, number[]][] = includedGroups.map(g => {
       const keepId = getKeepId(g);
       const loserIds = g.files.filter(f => f.id !== keepId).map(f => f.id);
       return [keepId, loserIds];
     });
-    addLog('info', `Resolving ${duplicateGroups.length} duplicate groups...`);
+    addLog('info', `Resolving ${includedGroups.length} duplicate groups...`);
     try {
       const result = await invoke<DuplicateResolveResult>('resolve_duplicates', {
         workspacePath,
@@ -364,6 +412,7 @@ export function CleanerModule() {
   const handleDupReset = () => {
     setDupStep(1); setDuplicateGroups([]); setKeepOverrides({});
     setDupResolveResult(null); setSelectedGroupId(null);
+    setExcludedGroupIds(new Set());
   };
 
   // ── Render helpers ─────────────────────────────────────────────────────
@@ -860,32 +909,72 @@ export function CleanerModule() {
                     </div>
                   ) : (
                     <>
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[9px] font-mono text-industrial-amber uppercase">
+                          {includedGroups.length} of {duplicateGroups.length} groups selected for resolve
+                        </span>
+                        <button
+                          onClick={() => setExcludedGroupIds(
+                            excludedGroupIds.size === 0
+                              ? new Set(duplicateGroups.map(g => g.group_id))
+                              : new Set()
+                          )}
+                          className="text-[9px] font-mono text-industrial-cyan hover:underline uppercase"
+                        >
+                          {excludedGroupIds.size === 0 ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
                       <div className="space-y-1 max-h-[440px] overflow-y-auto pr-1 custom-scrollbar">
-                        {duplicateGroups.map(g => (
-                          <button
-                            key={g.group_id}
-                            onClick={() => setSelectedGroupId(g.group_id)}
-                            className={`w-full p-4 border text-left transition-all ${
-                              selectedGroupId === g.group_id
-                                ? 'border-industrial-amber bg-industrial-amber/5'
-                                : 'border-industrial-border hover:border-industrial-text-dim/50 bg-industrial-panel'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <MatchBadge matchType={g.match_type} score={g.score} />
-                              <span className="text-[9px] font-mono text-industrial-text-dim">{g.files.length} files</span>
+                        {duplicateGroups.map(g => {
+                          const included = !excludedGroupIds.has(g.group_id);
+                          return (
+                            <div
+                              key={g.group_id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setSelectedGroupId(g.group_id)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') setSelectedGroupId(g.group_id); }}
+                              className={`w-full p-4 border text-left transition-all cursor-pointer ${
+                                selectedGroupId === g.group_id
+                                  ? 'border-industrial-amber bg-industrial-amber/5'
+                                  : 'border-industrial-border hover:border-industrial-text-dim/50 bg-industrial-panel'
+                              } ${included ? '' : 'opacity-40'}`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  {/* Checkbox include/exclude dal resolve (v0.5.13) */}
+                                  <span
+                                    role="checkbox"
+                                    aria-checked={included}
+                                    title={included ? 'Included in resolve — click to skip this group' : 'Skipped — click to include in resolve'}
+                                    onClick={(e) => { e.stopPropagation(); toggleGroupExcluded(g.group_id); }}
+                                    className={`w-4 h-4 border flex-shrink-0 flex items-center justify-center transition-all ${
+                                      included ? 'border-industrial-amber bg-industrial-amber' : 'border-industrial-border'
+                                    }`}
+                                  >
+                                    {included && <span className="w-2 h-2 bg-black" />}
+                                  </span>
+                                  <MatchBadge matchType={g.match_type} score={g.score} />
+                                </div>
+                                <span className="text-[9px] font-mono text-industrial-text-dim">{g.files.length} files</span>
+                              </div>
+                              <p className="text-[11px] font-bold text-white truncate uppercase tracking-wider">
+                                {g.files[0]?.artist ?? '—'} — {g.files[0]?.title ?? g.files[0]?.filename}
+                              </p>
                             </div>
-                            <p className="text-[11px] font-bold text-white truncate uppercase tracking-wider">
-                              {g.files[0]?.artist ?? '—'} — {g.files[0]?.title ?? g.files[0]?.filename}
-                            </p>
-                          </button>
-                        ))}
+                          );
+                        })}
                       </div>
                       <button
                         onClick={() => setDupStep(3)}
-                        className="w-full bg-industrial-amber text-black py-4 font-bold text-xs uppercase tracking-widest hover:bg-white transition-all active:scale-95"
+                        disabled={includedGroups.length === 0}
+                        className={`w-full py-4 font-bold text-xs uppercase tracking-widest transition-all active:scale-95 ${
+                          includedGroups.length > 0
+                            ? 'bg-industrial-amber text-black hover:bg-white'
+                            : 'bg-industrial-border text-industrial-text-dim cursor-not-allowed'
+                        }`}
                       >
-                        Proceed to Resolve ({duplicateGroups.length} groups)
+                        Proceed to Resolve ({includedGroups.length} of {duplicateGroups.length} groups)
                       </button>
                     </>
                   )}
@@ -957,8 +1046,13 @@ export function CleanerModule() {
                     </div>
                     <h3 className="text-3xl font-black uppercase tracking-tighter mb-4">Resolve Confirmation</h3>
                     <p className="max-w-md mx-auto text-industrial-text-dim text-sm mb-2 leading-relaxed">
-                      Loser files from <span className="text-white font-bold">{duplicateGroups.length} groups</span> will be moved to{' '}
+                      Loser files from <span className="text-white font-bold">{includedGroups.length} of {duplicateGroups.length} groups</span> will be moved to{' '}
                       <span className="font-mono text-industrial-cyan">_Duplicates/</span>. Best-pick files remain untouched.
+                      {excludedGroupIds.size > 0 && (
+                        <span className="block mt-1 text-[10px] font-mono text-industrial-amber uppercase">
+                          {excludedGroupIds.size} group{excludedGroupIds.size > 1 ? 's' : ''} skipped by your selection
+                        </span>
+                      )}
                     </p>
                     {dupDestPath && (
                       <p className="font-mono text-[10px] text-industrial-text-dim mb-8 truncate max-w-lg mx-auto">{dupDestPath}</p>
