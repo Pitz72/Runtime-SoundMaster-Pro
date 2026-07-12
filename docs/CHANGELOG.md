@@ -6,6 +6,16 @@ Indice di tutte le versioni rilasciate. Ogni versione ha il proprio documento de
 
 ## Versioni
 
+### v0.5.15 — Backend Hardening: DB, Scanner, Duplicati
+
+> 2026-07-12 · Batch criticità medie backend (11, 12, 13, 14, 16, 17, 18, 20, 28, 29, 30)
+
+**DB**: trigger FTS5 (l'indice full-text era vuoto dal primo giorno) + rebuild una tantum; `open_db()` con `foreign_keys=ON`; stats senza errori mascherati. **Scanner**: workspace inesistente ora è un errore esplicito; upsert aggiorna size/format di file modificati; esclusione quarantena case-insensitive. **Duplicati**: lookup O(1) nei gruppi; cross-check durata nella fase acustica (bucket divisi dove il salto supera 10s); il backend skippa loser==keep; progress bar binary coerente.
+
+[Dettaglio completo](log/0.5.15.md)
+
+---
+
 ### v0.5.14 — Cross-Drive Move Fallback
 
 > 2026-07-12 · Fix grave — criticità 9 dell'audit

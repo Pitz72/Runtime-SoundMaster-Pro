@@ -1,5 +1,5 @@
 /// duplicates.rs — The Cleaner: Duplicate Detection & Resolution
-/// Runtime SoundMaster Pro — v0.5.11
+/// Runtime SoundMaster Pro — v0.5.15
 ///
 /// Responsabilità:
 /// - Phase 1 "binary": SHA-256 su file della stessa dimensione → duplicati esatti
@@ -13,7 +13,6 @@ use crate::logger;
 use crate::utils::{
     canonical_or_raw, collision_safe_path, hidden_command, move_file, workspace_like_prefix,
 };
-use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -261,8 +260,7 @@ fn detect_duplicates_impl(
         .app_data_dir()
         .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
 
-    let conn = Connection::open(data_dir.join("library.db"))
-        .map_err(|e| format!("Cannot open DB: {e}"))?;
+    let conn = crate::db::open_db(&data_dir)?;
 
     // Legge solo i track non ancora flaggati come problematici, e solo quelli
     // DEL WORKSPACE CORRENTE.
@@ -307,6 +305,16 @@ fn detect_duplicates_impl(
     let total = tracks.len() as u64;
     let mut groups: Vec<DuplicateGroup> = Vec::new();
 
+    // Lookup O(1) id → track (fix v0.5.15 — criticità 17): il vecchio
+    // tracks.iter().find() dentro i loop dei gruppi era O(n·m) — misurabile
+    // su librerie da 36k+ track.
+    let by_id: HashMap<i64, &TrackRow> = tracks.iter().map(|t| (t.id, t)).collect();
+    let members_of = |ids: &[i64]| -> Vec<TrackRow> {
+        ids.iter()
+            .filter_map(|id| by_id.get(id).map(|t| (*t).clone()))
+            .collect()
+    };
+
     logger::log_separator("DUPLICATES — DETECTION");
     logger::log_detail("DUPLICATES", &format!("Track da analizzare: {}", total));
     logger::log_detail(
@@ -344,6 +352,11 @@ fn detect_duplicates_impl(
         .filter(|g| g.len() >= 2)
         .collect();
 
+    // Totale coerente per la progress bar (fix v0.5.15 — criticità 28):
+    // la fase binary processa solo i candidati stessa-dimensione, non tutti
+    // i track — prima la barra confrontava processed con il totale sbagliato.
+    let hash_total: u64 = size_candidates.iter().map(|g| g.len() as u64).sum();
+
     let mut processed_binary = 0u64;
     for group in &size_candidates {
         let mut by_hash: HashMap<String, Vec<i64>> = HashMap::new();
@@ -355,7 +368,7 @@ fn detect_duplicates_impl(
                     DuplicateProgress {
                         phase: "binary".to_string(),
                         processed: processed_binary,
-                        total,
+                        total: hash_total,
                         current_file: t.filename.clone(),
                         groups_found: groups.len() as u64,
                     },
@@ -366,10 +379,7 @@ fn detect_duplicates_impl(
             }
         }
         for ids in by_hash.values().filter(|v| v.len() >= 2) {
-            let members: Vec<TrackRow> = ids
-                .iter()
-                .filter_map(|id| tracks.iter().find(|t| t.id == *id).cloned())
-                .collect();
+            let members = members_of(ids);
             let best_id = pick_best(&members);
             group_counter += 1;
             let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
@@ -431,10 +441,7 @@ fn detect_duplicates_impl(
     }
 
     for ids in by_meta.values().filter(|v| v.len() >= 2) {
-        let members: Vec<TrackRow> = ids
-            .iter()
-            .filter_map(|id| tracks.iter().find(|t| t.id == *id).cloned())
-            .collect();
+        let members = members_of(ids);
         let best_id = pick_best(&members);
         group_counter += 1;
         let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
@@ -479,6 +486,9 @@ fn detect_duplicates_impl(
             .collect();
 
         let mut by_fingerprint: HashMap<String, Vec<i64>> = HashMap::new();
+        // Durata calcolata da fpcalc per ogni track — usata per il cross-check
+        // dei gruppi acustici (fix v0.5.15 — criticità 16)
+        let mut fp_durations: HashMap<i64, f64> = HashMap::new();
         for (i, t) in ungrouped.iter().enumerate() {
             if (i + 1) % 20 == 0 {
                 let _ = app.emit(
@@ -514,35 +524,71 @@ fn detect_duplicates_impl(
                 // Usa i primi 120 caratteri come chiave di confronto
                 // (fingerprint identici hanno stesso prefisso)
                 let key = fp.chars().take(120).collect::<String>();
+                fp_durations.insert(t.id, dur);
                 by_fingerprint.entry(key).or_default().push(t.id);
             }
         }
 
+        // Cross-check durata (fix v0.5.15 — criticità 16): il prefisso a 120
+        // caratteri è un'euristica — brani diversi con intro molto simili
+        // possono condividerlo. Ogni bucket viene ordinato per durata e
+        // suddiviso dove il salto tra track consecutivi supera i 10 secondi:
+        // file con durate incompatibili non finiscono mai nello stesso gruppo.
+        let duration_of = |id: i64| -> f64 {
+            fp_durations
+                .get(&id)
+                .copied()
+                .or_else(|| by_id.get(&id).and_then(|t| t.duration_secs))
+                .unwrap_or(0.0)
+        };
+
         for ids in by_fingerprint.values().filter(|v| v.len() >= 2) {
-            let members: Vec<TrackRow> = ids
-                .iter()
-                .filter_map(|id| tracks.iter().find(|t| t.id == *id).cloned())
-                .collect();
-            let best_id = pick_best(&members);
-            group_counter += 1;
-            let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
-            logger::log_detail(
-                "DUPLICATES",
-                &format!(
-                    "GRUPPO acoustic [{}]: {} file — best_pick id={} ({})",
-                    group_counter,
-                    members.len(),
-                    best_id,
-                    filenames.join(" | ")
-                ),
-            );
-            groups.push(DuplicateGroup {
-                group_id: format!("dup-{group_counter}"),
-                match_type: "acoustic".to_string(),
-                score: 90,
-                files: to_duplicate_files(&members, best_id),
-                best_pick_id: best_id,
+            let mut sorted_ids = ids.clone();
+            sorted_ids.sort_by(|a, b| {
+                duration_of(*a)
+                    .partial_cmp(&duration_of(*b))
+                    .unwrap_or(std::cmp::Ordering::Equal)
             });
+
+            // Partiziona in sottogruppi con durate contigue (gap <= 10s)
+            let mut subgroups: Vec<Vec<i64>> = Vec::new();
+            let mut current: Vec<i64> = Vec::new();
+            for id in sorted_ids {
+                match current.last() {
+                    Some(&prev) if (duration_of(id) - duration_of(prev)).abs() > 10.0 => {
+                        subgroups.push(std::mem::take(&mut current));
+                        current.push(id);
+                    }
+                    _ => current.push(id),
+                }
+            }
+            if !current.is_empty() {
+                subgroups.push(current);
+            }
+
+            for sub_ids in subgroups.iter().filter(|v| v.len() >= 2) {
+                let members = members_of(sub_ids);
+                let best_id = pick_best(&members);
+                group_counter += 1;
+                let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
+                logger::log_detail(
+                    "DUPLICATES",
+                    &format!(
+                        "GRUPPO acoustic [{}]: {} file — best_pick id={} ({})",
+                        group_counter,
+                        members.len(),
+                        best_id,
+                        filenames.join(" | ")
+                    ),
+                );
+                groups.push(DuplicateGroup {
+                    group_id: format!("dup-{group_counter}"),
+                    match_type: "acoustic".to_string(),
+                    score: 90,
+                    files: to_duplicate_files(&members, best_id),
+                    best_pick_id: best_id,
+                });
+            }
         }
     }
 
@@ -588,8 +634,7 @@ fn resolve_duplicates_impl(
         .app_data_dir()
         .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
 
-    let conn = Connection::open(data_dir.join("library.db"))
-        .map_err(|e| format!("Cannot open DB: {e}"))?;
+    let conn = crate::db::open_db(&data_dir)?;
 
     let quarantine_dir = match quarantine_path {
         Some(ref p) => std::path::PathBuf::from(p),
@@ -630,8 +675,19 @@ fn resolve_duplicates_impl(
         ),
     );
 
-    for (_keep_id, loser_ids) in &resolutions {
+    for (keep_id, loser_ids) in &resolutions {
         for id in loser_ids {
+            // Validazione difensiva (fix v0.5.15 — criticità 18): il backend
+            // non si fida del frontend — un loser che coincide con il keep
+            // non viene mai spostato (sposterebbe proprio il file da tenere).
+            if id == keep_id {
+                logger::log_detail(
+                    "DUPLICATES",
+                    &format!("SKIP: loser id {} coincide con keep id — ignorato", id),
+                );
+                failed += 1;
+                continue;
+            }
             let row: rusqlite::Result<(String, String)> = conn.query_row(
                 "SELECT path, filename FROM tracks WHERE id = ?1",
                 [id],

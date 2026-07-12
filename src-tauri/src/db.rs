@@ -1,10 +1,11 @@
 /// db.rs — Modulo Database SQLite
-/// Runtime SoundMaster Pro — v0.5.9
+/// Runtime SoundMaster Pro — v0.5.15
 ///
 /// Responsabilità:
 /// - Inizializzazione del database `library.db` con WAL mode
-/// - Schema iniziale: tabelle `tracks`, `scans`, `cover_art`
-/// - Path: <app_data_dir>/runtime-soundmaster-pro/library.db
+/// - Schema iniziale: tabelle `tracks`, `scans`, `cover_art` + trigger FTS5
+/// - `open_db`: connessione con PRAGMA per-connessione (foreign_keys, synchronous)
+/// - Path: <app_data_dir>/library.db (direttamente nella app data dir Tauri)
 
 use rusqlite::{Connection, Result as SqlResult};
 use serde::{Deserialize, Serialize};
@@ -61,6 +62,24 @@ const INIT_SQL: &str = "
         content_rowid='id'
     );
 
+    -- Trigger di sincronizzazione FTS5 (fix v0.5.15 — criticità 11):
+    -- una tabella FTS external-content NON si popola da sola. Senza questi
+    -- trigger tracks_fts restava vuota per sempre.
+    CREATE TRIGGER IF NOT EXISTS tracks_fts_ai AFTER INSERT ON tracks BEGIN
+        INSERT INTO tracks_fts(rowid, artist, title, album, genre)
+        VALUES (new.id, new.artist, new.title, new.album, new.genre);
+    END;
+    CREATE TRIGGER IF NOT EXISTS tracks_fts_ad AFTER DELETE ON tracks BEGIN
+        INSERT INTO tracks_fts(tracks_fts, rowid, artist, title, album, genre)
+        VALUES ('delete', old.id, old.artist, old.title, old.album, old.genre);
+    END;
+    CREATE TRIGGER IF NOT EXISTS tracks_fts_au AFTER UPDATE ON tracks BEGIN
+        INSERT INTO tracks_fts(tracks_fts, rowid, artist, title, album, genre)
+        VALUES ('delete', old.id, old.artist, old.title, old.album, old.genre);
+        INSERT INTO tracks_fts(rowid, artist, title, album, genre)
+        VALUES (new.id, new.artist, new.title, new.album, new.genre);
+    END;
+
     -- Tabella sessioni di scansione
     CREATE TABLE IF NOT EXISTS scans (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,6 +130,36 @@ pub fn init_database(app_data_dir: &PathBuf) -> SqlResult<Connection> {
     // Esegue l'intero script di inizializzazione
     conn.execute_batch(INIT_SQL)?;
 
+    // PRAGMA per-connessione (fix v0.5.15 — criticità 12): foreign_keys è OFF
+    // di default in SQLite e va attivato su OGNI connessione. Senza questo,
+    // il ON DELETE CASCADE di cover_art non funzionerebbe mai.
+    conn.execute_batch("PRAGMA foreign_keys=ON;")?;
+
+    // Rebuild una tantum dell'indice FTS (fix v0.5.15 — criticità 11):
+    // i DB creati prima dei trigger hanno tracks popolata ma tracks_fts vuota.
+    // Il rebuild rilegge tutta la tabella content — eseguito solo se serve.
+    let tracks_count: i64 = conn.query_row("SELECT COUNT(*) FROM tracks", [], |r| r.get(0))?;
+    let fts_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM tracks_fts", [], |r| r.get(0))
+        .unwrap_or(0);
+    if tracks_count > 0 && fts_count == 0 {
+        conn.execute_batch("INSERT INTO tracks_fts(tracks_fts) VALUES('rebuild');")?;
+    }
+
+    Ok(conn)
+}
+
+/// Apre una connessione al DB con i PRAGMA per-connessione corretti.
+/// Da usare in ogni comando invece di `Connection::open` diretto:
+/// - `foreign_keys=ON` — OFF di default in SQLite (criticità 12)
+/// - `synchronous=NORMAL` — compromesso corretto in WAL mode
+/// (journal_mode=WAL è una proprietà persistente del file DB, già impostata
+/// da `init_database` — non serve ripeterla qui.)
+pub fn open_db(app_data_dir: &std::path::Path) -> Result<Connection, String> {
+    let conn = Connection::open(app_data_dir.join("library.db"))
+        .map_err(|e| format!("Cannot open DB: {e}"))?;
+    conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")
+        .map_err(|e| format!("DB PRAGMA failed: {e}"))?;
     Ok(conn)
 }
 
@@ -124,7 +173,9 @@ pub struct LibraryStats {
 }
 
 /// Comando Tauri: restituisce le statistiche aggregate della libreria.
-/// Apre una connessione read-only — sicuro con WAL mode.
+/// Fix v0.5.15 (criticità 20): gli errori di query non vengono più mascherati
+/// con `.unwrap_or(0)` — un DB corrotto ora produce un errore esplicito
+/// invece di mostrare silenziosamente "0 tracks".
 #[tauri::command]
 pub fn get_library_stats(app: tauri::AppHandle) -> Result<LibraryStats, String> {
     let data_dir = app
@@ -132,42 +183,26 @@ pub fn get_library_stats(app: tauri::AppHandle) -> Result<LibraryStats, String> 
         .app_data_dir()
         .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
 
-    let conn = Connection::open(data_dir.join("library.db"))
-        .map_err(|e| format!("Cannot open DB: {e}"))?;
+    let conn = open_db(&data_dir)?;
+
+    let count_where = |cond: &str| -> Result<i64, String> {
+        conn.query_row(
+            &format!("SELECT COUNT(*) FROM tracks WHERE conforming_status='{cond}'"),
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| format!("Stats query failed ({cond}): {e}"))
+    };
 
     let total: i64 = conn
         .query_row("SELECT COUNT(*) FROM tracks", [], |r| r.get(0))
-        .unwrap_or(0);
-
-    let non_conform: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM tracks WHERE conforming_status='non_conform'",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-
-    let duplicates: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM tracks WHERE conforming_status='duplicate'",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-
-    let to_verify: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM tracks WHERE conforming_status='to_verify'",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
+        .map_err(|e| format!("Stats query failed (total): {e}"))?;
 
     Ok(LibraryStats {
         total_tracks: total,
-        non_conform,
-        duplicates,
-        to_verify,
+        non_conform: count_where("non_conform")?,
+        duplicates: count_where("duplicate")?,
+        to_verify: count_where("to_verify")?,
     })
 }
 

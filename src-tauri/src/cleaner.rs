@@ -1,5 +1,5 @@
 /// cleaner.rs — The Cleaner: Non-Conform Detection & Quarantine
-/// Runtime SoundMaster Pro — v0.5.11
+/// Runtime SoundMaster Pro — v0.5.15
 ///
 /// Responsabilità:
 /// - Rilevamento file non-conformi tramite regex su filename (pattern YouTube/video-rip)
@@ -13,7 +13,6 @@ use crate::utils::{
     canonical_or_raw, collision_safe_path, hidden_command, move_file, workspace_like_prefix,
 };
 use regex::Regex;
-use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::OnceLock;
@@ -329,8 +328,7 @@ fn detect_non_conform_impl(
         .app_data_dir()
         .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
 
-    let conn = Connection::open(data_dir.join("library.db"))
-        .map_err(|e| format!("Cannot open DB: {e}"))?;
+    let conn = crate::db::open_db(&data_dir)?;
 
     // Legge solo i track con stato 'unknown' DEL WORKSPACE CORRENTE.
     // Fix v0.5.11 (DB multi-workspace): senza il filtro sul path, la query
@@ -527,8 +525,7 @@ fn quarantine_non_conform_impl(
         .app_data_dir()
         .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
 
-    let conn = Connection::open(data_dir.join("library.db"))
-        .map_err(|e| format!("Cannot open DB: {e}"))?;
+    let conn = crate::db::open_db(&data_dir)?;
 
     // Crea la cartella di quarantena (non-distruttivo: mai eliminare)
     // Se l'utente ha specificato un path custom, usa quello; altrimenti <workspace>/_NonConform
