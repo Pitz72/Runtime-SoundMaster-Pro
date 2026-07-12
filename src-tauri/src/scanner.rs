@@ -1,5 +1,5 @@
 /// scanner.rs — Scansione ricorsiva workspace audio
-/// Runtime SoundMaster Pro — v0.5.15
+/// Runtime SoundMaster Pro — v0.5.17
 ///
 /// Responsabilità:
 /// - Scansione ricorsiva della cartella workspace
@@ -53,6 +53,90 @@ pub struct ScanResult {
     pub scan_id: i64,
     pub total_files: u64,
     pub duration_secs: f64,
+}
+
+/// Metadati estratti da un file audio via lofty (fix v0.5.17 — criticità 10).
+struct TrackMeta {
+    artist: Option<String>,
+    title: Option<String>,
+    album: Option<String>,
+    genre: Option<String>,
+    year: Option<i64>,
+    bitrate_kbps: Option<i64>,
+    sample_rate: Option<i64>,
+    duration_secs: Option<f64>,
+}
+
+/// Legge tag e proprietà audio con lofty. Restituisce `None` se il file non è
+/// leggibile (corrotto/formato non riconosciuto) — la detection dei corrotti
+/// resta responsabilità di FFprobe nel Cleaner; qui si degrada in silenzio.
+/// Le stringhe vuote nei tag vengono normalizzate a NULL, così la fase
+/// metadata dei duplicati non raggruppa file con tag vuoti.
+fn read_tags(path: &std::path::Path) -> Option<TrackMeta> {
+    use lofty::file::TaggedFileExt;
+    use lofty::prelude::{Accessor, AudioFile};
+
+    let tagged = lofty::read_from_path(path).ok()?;
+    let props = tagged.properties();
+    let tag = tagged.primary_tag().or_else(|| tagged.first_tag());
+
+    let clean = |s: Option<std::borrow::Cow<'_, str>>| -> Option<String> {
+        s.map(|c| c.trim().to_string()).filter(|s| !s.is_empty())
+    };
+
+    // L'anno può essere una data completa ("2021-05-01") — si estraggono
+    // le prime 4 cifre. ItemKey::Year copre TYER/TDRC/DATE nei vari formati.
+    let year = tag
+        .and_then(|t| t.get_string(lofty::tag::ItemKey::Year))
+        .and_then(|s| {
+            let digits: String = s.chars().take_while(|c| c.is_ascii_digit()).collect();
+            digits.parse::<i64>().ok()
+        })
+        .filter(|y| (1000..=9999).contains(y));
+
+    let duration = props.duration().as_secs_f64();
+    Some(TrackMeta {
+        artist: tag.and_then(|t| clean(t.artist())),
+        title: tag.and_then(|t| clean(t.title())),
+        album: tag.and_then(|t| clean(t.album())),
+        genre: tag.and_then(|t| clean(t.genre())),
+        year,
+        bitrate_kbps: props.audio_bitrate().map(|b| b as i64),
+        sample_rate: props.sample_rate().map(|s| s as i64),
+        duration_secs: if duration > 0.0 { Some(duration) } else { None },
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Smoke test manuale su file audio reali — ignorato di default perché
+    /// dipende dalla macchina. Eseguire con:
+    ///   cargo test read_tags_smoke -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn read_tags_smoke() {
+        let dir = std::path::Path::new(r"C:\Users\Utente\Music\Genesis");
+        if !dir.is_dir() {
+            eprintln!("skip: cartella di test non presente");
+            return;
+        }
+        let mut checked = 0;
+        for entry in std::fs::read_dir(dir).unwrap().filter_map(|e| e.ok()).take(5) {
+            let p = entry.path();
+            if p.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("flac") || e.eq_ignore_ascii_case("mp3")).unwrap_or(false) {
+                let meta = read_tags(&p).expect("file audio reale deve essere leggibile");
+                eprintln!(
+                    "{:?} → artist={:?} title={:?} bitrate={:?} dur={:?}",
+                    p.file_name().unwrap(), meta.artist, meta.title, meta.bitrate_kbps, meta.duration_secs
+                );
+                assert!(meta.duration_secs.unwrap_or(0.0) > 0.0);
+                checked += 1;
+            }
+        }
+        assert!(checked > 0, "nessun file audio trovato nella cartella di test");
+    }
 }
 
 /// Logica di scansione eseguita in thread bloccante (spawn_blocking).
@@ -229,73 +313,167 @@ fn scan_workspace_impl(
 
     logger::log_detail("SCANNER", &format!("File audio trovati: {}", total));
 
+    // Mappa dei track già indicizzati: path → (size, ha già artist).
+    // Serve per decidere quali file necessitano della lettura tag
+    // (fix v0.5.17 — criticità 10): nuovi, modificati su disco, o indicizzati
+    // da versioni precedenti che non estraevano i metadati.
+    let mut existing: std::collections::HashMap<String, (i64, bool)> =
+        std::collections::HashMap::new();
+    {
+        let mut stmt = conn
+            .prepare(
+                "SELECT path, COALESCE(file_size_bytes, 0), artist IS NOT NULL \
+                 FROM tracks WHERE path LIKE ?1 ESCAPE '!'",
+            )
+            .map_err(|e| format!("Scanner: existing query failed: {e}"))?;
+        let rows = stmt
+            .query_map([&like_pattern], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    (row.get::<_, i64>(1)?, row.get::<_, bool>(2)?),
+                ))
+            })
+            .map_err(|e| format!("Scanner: existing query failed: {e}"))?;
+        for (path, info) in rows.filter_map(|r| r.ok()) {
+            existing.insert(path, info);
+        }
+    }
+
     // --- Fase 2: Indicizzazione DB-First (stream diretto, senza collect) ---
     // Upsert (fix v0.5.15 — criticità 14): il vecchio INSERT OR IGNORE non
     // aggiornava mai file_size/format/scan_id di file già indicizzati — se un
     // file cambiava su disco, il pre-filtro per dimensione dei duplicati
     // lavorava su dati stale. ON CONFLICT aggiorna i campi filesystem
     // preservando i metadati (artist/title/...) e lo status.
-    let mut stmt = conn
-        .prepare(
-            "INSERT INTO tracks
-             (path, filename, format, file_size_bytes, scan_id, conforming_status)
-             VALUES (?1, ?2, ?3, ?4, ?5, 'unknown')
-             ON CONFLICT(path) DO UPDATE SET
-               filename = excluded.filename,
-               format = excluded.format,
-               file_size_bytes = excluded.file_size_bytes,
-               scan_id = excluded.scan_id",
-        )
-        .map_err(|e| format!("Scanner: cannot prepare statement: {e}"))?;
-
-    // Con l'upsert changes() vale 1 sia per insert che per update: i nuovi
-    // file si contano confrontando il totale righe prima/dopo il pass.
+    //
+    // Estrazione metadati (fix v0.5.17 — criticità 10): prima di questa
+    // versione NESSUN modulo popolava artist/title/bitrate/duration — la fase
+    // "metadata" dei duplicati era di fatto morta e il best-pick decideva solo
+    // su formato+dimensione. I tag vengono letti con lofty (crate nativo,
+    // nessun subprocess) solo per i file nuovi/modificati/mai taggati: i
+    // rescan su librerie già taggate restano veloci.
+    //
+    // L'intero pass gira in una transazione unica: 36k upsert+update in
+    // autocommit sarebbero 36k commit WAL. La scansione è ri-eseguibile,
+    // quindi la perdita del batch in caso di crash è accettabile.
     let rows_before: i64 = conn
         .query_row("SELECT COUNT(*) FROM tracks", [], |r| r.get(0))
         .unwrap_or(0);
 
     let mut scanned = 0u64;
-    for entry in WalkDir::new(&workspace_path)
-        .follow_links(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| is_audio_file(e))
+    let mut tags_read = 0u64;
+    let mut tag_failures = 0u64;
+
+    let tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("Scanner: index transaction failed: {e}"))?;
     {
-        scanned += 1;
-        let path = entry.path();
-
-        let filename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .to_string();
-
-        let format = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("unknown")
-            .to_lowercase();
-
-        let file_size = std::fs::metadata(path)
-            .map(|m| m.len() as i64)
-            .unwrap_or(0);
-
-        let path_str = path.to_string_lossy().to_string();
-
-        let _ = stmt.execute(params![path_str, filename, format, file_size, scan_id]);
-
-        if scanned % 100 == 0 || scanned == total {
-            app.emit(
-                "scan-progress",
-                ScanProgress {
-                    scanned,
-                    total,
-                    current_file: filename,
-                    phase: String::from("indexing"),
-                },
+        let mut upsert = tx
+            .prepare(
+                "INSERT INTO tracks
+                 (path, filename, format, file_size_bytes, scan_id, conforming_status)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 'unknown')
+                 ON CONFLICT(path) DO UPDATE SET
+                   filename = excluded.filename,
+                   format = excluded.format,
+                   file_size_bytes = excluded.file_size_bytes,
+                   scan_id = excluded.scan_id",
             )
-            .ok();
+            .map_err(|e| format!("Scanner: cannot prepare statement: {e}"))?;
+
+        // COALESCE su duration_secs: non sovrascrive una durata già presente
+        // (es. calcolata da fpcalc) con NULL se i tag non la riportano.
+        let mut tag_update = tx
+            .prepare(
+                "UPDATE tracks SET
+                   artist = ?1, title = ?2, album = ?3, genre = ?4, year = ?5,
+                   bitrate = ?6, sample_rate = ?7,
+                   duration_secs = COALESCE(?8, duration_secs)
+                 WHERE path = ?9",
+            )
+            .map_err(|e| format!("Scanner: cannot prepare tag statement: {e}"))?;
+
+        for entry in WalkDir::new(&workspace_path)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| is_audio_file(e))
+        {
+            scanned += 1;
+            let path = entry.path();
+
+            let filename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            let format = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("unknown")
+                .to_lowercase();
+
+            let file_size = std::fs::metadata(path)
+                .map(|m| m.len() as i64)
+                .unwrap_or(0);
+
+            let path_str = path.to_string_lossy().to_string();
+
+            let _ = upsert.execute(params![path_str, filename, format, file_size, scan_id]);
+
+            // Tag da leggere solo se: file nuovo, dimensione cambiata,
+            // o record esistente senza artist (indicizzato pre-v0.5.17)
+            let needs_tags = match existing.get(&path_str) {
+                Some((known_size, has_artist)) => *known_size != file_size || !*has_artist,
+                None => true,
+            };
+
+            if needs_tags {
+                match read_tags(path) {
+                    Some(meta) => {
+                        tags_read += 1;
+                        let _ = tag_update.execute(params![
+                            meta.artist,
+                            meta.title,
+                            meta.album,
+                            meta.genre,
+                            meta.year,
+                            meta.bitrate_kbps,
+                            meta.sample_rate,
+                            meta.duration_secs,
+                            path_str
+                        ]);
+                    }
+                    None => tag_failures += 1,
+                }
+            }
+
+            if scanned % 100 == 0 || scanned == total {
+                app.emit(
+                    "scan-progress",
+                    ScanProgress {
+                        scanned,
+                        total,
+                        current_file: filename,
+                        phase: String::from("indexing"),
+                    },
+                )
+                .ok();
+            }
         }
+    }
+    tx.commit()
+        .map_err(|e| format!("Scanner: index commit failed: {e}"))?;
+
+    if tags_read > 0 || tag_failures > 0 {
+        logger::log_detail(
+            "SCANNER",
+            &format!(
+                "Metadati: {} file taggati, {} senza tag leggibili",
+                tags_read, tag_failures
+            ),
+        );
     }
 
     let duration = start.elapsed().as_secs_f64();

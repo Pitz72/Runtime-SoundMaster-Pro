@@ -6,6 +6,16 @@ Indice di tutte le versioni rilasciate. Ogni versione ha il proprio documento de
 
 ## Versioni
 
+### v0.5.17 — Metadati Reali: lofty Tag Extraction
+
+> 2026-07-12 · Fix criticità 10 — chiude il ciclo di bugfixing dell'audit 12/07/2026
+
+**Il gap**: nessun modulo popolava artist/title/bitrate/duration — la fase metadata dei duplicati era morta, il best-pick decideva solo su formato+size, la UI mostrava "—". **Fix**: estrazione tag con lofty (nativo Rust, ~ms/file) durante la scansione — selettiva (solo file nuovi/modificati/mai taggati), in transazione unica, verificata su FLAC reali. Serve un rescan per popolare i tag dei file già indicizzati.
+
+[Dettaglio completo](log/0.5.17.md)
+
+---
+
 ### v0.5.16 — Frontend Polish + Security Hardening
 
 > 2026-07-12 · Batch criticità lievi frontend + hardening (19, 21, 22, 23, 24, 25, 26, 27)
