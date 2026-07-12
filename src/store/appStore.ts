@@ -218,8 +218,10 @@ function newLogId(): string {
 // --- Store ---
 
 export const useAppStore = create<AppState>((set) => ({
-  // Versione app — aggiornata da App.tsx via getVersion() Tauri
-  appVersion: '0.5.9',
+  // Versione app — aggiornata da App.tsx via getVersion() Tauri.
+  // Placeholder neutro fino al boot: mai una versione hardcoded che
+  // diventa stale (fix v0.5.16).
+  appVersion: '…',
   setAppVersion: (v) => set({ appVersion: v }),
 
   // Navigazione

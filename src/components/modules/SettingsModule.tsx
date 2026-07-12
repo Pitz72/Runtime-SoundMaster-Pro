@@ -30,7 +30,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function SettingsModule() {
-  const { systemStatus, workspacePath, setWorkspacePath, addLog } = useAppStore();
+  // appVersion dallo store (fix v0.5.16 — criticità 21): questo modulo aveva
+  // ancora "v0.2.0" hardcoded in due punti, sfuggito al fix versione dinamica v0.5.9
+  const { systemStatus, workspacePath, setWorkspacePath, addLog, appVersion } = useAppStore();
 
   const handleSelectWorkspace = async () => {
     try {
@@ -56,7 +58,7 @@ export function SettingsModule() {
         <div>
           <h2 className="text-3xl font-black font-sans tracking-tighter uppercase leading-none">Settings</h2>
           <p className="font-mono text-[10px] text-industrial-text-dim uppercase tracking-widest mt-1">
-            System Configuration — v0.2.0
+            System Configuration — v{appVersion}
           </p>
         </div>
       </div>
@@ -134,7 +136,7 @@ export function SettingsModule() {
         <SectionTitle>Application</SectionTitle>
         <div className="space-y-0">
           <InfoRow label="Product"    value="Runtime SoundMaster Pro"       status={null} />
-          <InfoRow label="Version"    value="0.2.0"                          status={null} />
+          <InfoRow label="Version"    value={appVersion}                     status={null} />
           <InfoRow label="Identifier" value="it.runtimeradio.soundmasterpro" status={null} />
           <InfoRow label="Engine"     value="Tauri v2 + Rust"                status={null} />
           <InfoRow label="UI"         value="React 19 + Tailwind CSS 4"       status={null} />

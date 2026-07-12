@@ -124,7 +124,13 @@ export default function App() {
   // ── Listener globale eventi scan-progress ─────────────────────────────────
   // Registrato una sola volta al mount — gestisce progress e refresh stats
   // al termine di ogni scansione workspace.
+  //
+  // Pattern cleanup (fix v0.5.16 — criticità 19): se il componente smonta
+  // prima che la promise di listen() risolva, la vecchia closure non chiamava
+  // mai unlisten → listener duplicati (visibile in dev con StrictMode).
+  // Il flag `disposed` garantisce l'unregister anche in quel caso.
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | null = null;
 
     listen<ScanProgress>("scan-progress", async (event) => {
@@ -134,14 +140,12 @@ export default function App() {
       if (payload.phase === "complete") {
         setIsScanning(false);
         setScanProgress(null);
-        // Aggiorna le statistiche con i dati reali post-scansione
+        // Aggiorna le statistiche con i dati reali post-scansione.
+        // Il log di completamento è emesso dal modulo che ha avviato la
+        // scansione (fix v0.5.16 — criticità 24: doppio log rimosso).
         try {
           const stats = await invoke<LibraryStats>("get_library_stats");
           setLibraryStats(stats);
-          addLog(
-            "success",
-            `Scan complete — ${stats.total_tracks.toLocaleString()} tracks indexed.`
-          );
         } catch (err) {
           addLog("error", "Failed to refresh library stats", String(err));
         }
@@ -150,18 +154,22 @@ export default function App() {
       if (payload.phase === "error") {
         setIsScanning(false);
         setScanProgress(null);
+        addLog("error", "Workspace scan failed", payload.current_file || undefined);
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
 
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [addLog, setLibraryStats, setScanProgress, setIsScanning]);
 
   // ── Listener globale eventi cleaner-progress ──────────────────────────────
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | null = null;
 
     listen<CleanerProgress>("cleaner-progress", (event) => {
@@ -179,16 +187,19 @@ export default function App() {
         addLog("error", "Cleaner analysis failed");
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
 
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [addLog, setIsCleanerRunning, setCleanerProgress]);
 
   // ── Listener globale eventi duplicate-progress ────────────────────────────
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | null = null;
 
     listen<DuplicateProgress>("duplicate-progress", (event) => {
@@ -205,10 +216,12 @@ export default function App() {
         addLog("error", "Duplicate analysis failed");
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn();
+      else unlisten = fn;
     });
 
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [addLog, setIsDuplicateRunning, setDuplicateProgress]);

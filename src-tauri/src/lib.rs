@@ -15,9 +15,11 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Plugin shell rimosso in v0.5.16 (criticità 26): mai usato dal frontend
+    // e con permessi allow-execute/allow-spawn inutilmente ampi. I processi
+    // esterni (ffprobe/fpcalc) sono lanciati direttamente dal backend Rust.
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         // Inizializzazione DB al primo avvio — garantisce che lo schema
         // esista prima che qualsiasi comando venga invocato dal frontend.

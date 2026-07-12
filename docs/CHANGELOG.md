@@ -6,6 +6,16 @@ Indice di tutte le versioni rilasciate. Ogni versione ha il proprio documento de
 
 ## Versioni
 
+### v0.5.16 — Frontend Polish + Security Hardening
+
+> 2026-07-12 · Batch criticità lievi frontend + hardening (19, 21, 22, 23, 24, 25, 26, 27)
+
+**Frontend**: listener Tauri senza leak (flag disposed), doppio log scan rimosso, "v0.2.0" hardcoded in Settings eliminato (versione dinamica ovunque), etichette finte "Kernel v2.0.4-LTS" sostituite con la versione reale, uptime senza drift. **Logger**: rotazione a 5 MB, timestamp con data (`YYYY-MM-DD HH:MM:SSZ`). **Hardening**: CSP attiva, plugin shell rimosso (esponeva allow-execute/allow-spawn mai usati), tokio snellito.
+
+[Dettaglio completo](log/0.5.16.md)
+
+---
+
 ### v0.5.15 — Backend Hardening: DB, Scanner, Duplicati
 
 > 2026-07-12 · Batch criticità medie backend (11, 12, 13, 14, 16, 17, 18, 20, 28, 29, 30)

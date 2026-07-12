@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -81,19 +81,21 @@ export function HubModule() {
     isScanning,
     setIsScanning,
     scanProgress,
+    appVersion,
   } = useAppStore();
   const [uptime, setUptime] = useState('000:00:00');
 
-  // Uptime ticker
+  // Uptime ticker — calcolato dal timestamp di mount invece che incrementando
+  // la stringa precedente (fix v0.5.16 — criticità 27: il vecchio approccio
+  // driftava perché setInterval non è garantito a 1000ms esatti).
+  const mountedAt = useRef(Date.now());
   useEffect(() => {
     const interval = setInterval(() => {
-      setUptime((prev) => {
-        const [h, m, s] = prev.split(':').map(Number);
-        let ns = s + 1, nm = m, nh = h;
-        if (ns >= 60) { ns = 0; nm += 1; }
-        if (nm >= 60) { nm = 0; nh += 1; }
-        return `${nh.toString().padStart(3, '0')}:${nm.toString().padStart(2, '0')}:${ns.toString().padStart(2, '0')}`;
-      });
+      const secs = Math.floor((Date.now() - mountedAt.current) / 1000);
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      setUptime(`${h.toString().padStart(3, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -140,7 +142,7 @@ export function HubModule() {
             <div className="flex items-center gap-2 mb-4">
               <span className="w-2 h-2 bg-industrial-cyan animate-pulse" />
               <span className="font-mono text-[10px] text-industrial-cyan tracking-[0.2em] uppercase">
-                Kernel v2.0.4-LTS // SQLite WAL ACTIVE
+                Rust Engine v{appVersion} // SQLite WAL
               </span>
             </div>
             <h2 className="text-6xl font-black font-sans tracking-tighter uppercase mb-4 leading-none">

@@ -17,7 +17,7 @@ const TYPE_CLASS: Record<LogType, string> = {
 };
 
 export function LogPanel() {
-  const { logs } = useAppStore();
+  const { logs, appVersion } = useAppStore();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll al fondo del log interno quando arrivano nuovi messaggi.
@@ -36,7 +36,7 @@ export function LogPanel() {
           Mission Log
         </h3>
         <span className="text-[9px] font-mono text-industrial-text-dim/30 uppercase tracking-tighter">
-          Kernel v2.0.4-LTS
+          v{appVersion}
         </span>
       </div>
 
