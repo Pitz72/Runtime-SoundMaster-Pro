@@ -260,7 +260,7 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 
 ### 📅 8. Roadmap di Sviluppo
 
-> **Aggiornamento al 2026-04-04 — v0.5.10**: Le fasi 0, 1 e 2 sono completate con ciclo esteso di fix post-test reale. Vedere `docs/CHANGELOG.md` per il dettaglio di ogni versione rilasciata.
+> **Aggiornamento al 2026-07-12 — v0.5.17**: Le fasi 0, 1 e 2 sono completate. Il 12/07/2026 è stato eseguito un audit completo riga-per-riga di tutto il codice (Rust + React) e un ciclo di bugfixing radicale in 7 release (v0.5.11 → v0.5.17) che ha chiuso tutte le criticità gravissime, gravi, medie e lievi emerse. La base è ora pronta per la Fase 3 (The Conformer). Vedere `docs/CHANGELOG.md` per il dettaglio di ogni versione rilasciata.
 
 #### Fase 0 — Setup Ambiente ✅ *Completata: 2026-03-31 — v0.0.1*
 
@@ -316,6 +316,26 @@ Queste sono le criticità documentate in RuntimeAudioManagerPro che **NON devono
 - [x] Spiegazione "Groups" in Step 2 Duplicates (v0.5.9)
 - [x] Guardia workspace = destinazione: rifiuto + log error (v0.5.10)
 - [x] Badge `AUTO — subfolder of source` su destinazioni automatiche (v0.5.10)
+
+##### Ciclo bugfixing radicale pre-Conformer — audit completo riga-per-riga (v0.5.11 → v0.5.17, 2026-07-12)
+
+- [x] **DB multi-workspace**: filtro `path LIKE` workspace-scoped in detect_non_conform e detect_duplicates — mai più risultati/spostamenti contaminati tra workspace (v0.5.11)
+- [x] **Guardia backend Genesis**: destinazione == workspace rifiutata su path canonicalizzati + guardia per-file già-in-quarantena (v0.5.11)
+- [x] Rescan non resuscita più i file in quarantena (stop loop rinomine `_1` tra sessioni) (v0.5.11)
+- [x] Purga record orfani a ogni scan — eliminati i falsi "corrupt" su file cancellati (v0.5.11)
+- [x] `workspace_like_prefix`: wildcard LIKE escapate + separatore finale, 5 unit test (v0.5.11)
+- [x] `hidden_command` con CREATE_NO_WINDOW su tutti i processi figli — stop ai flash di console in build release (v0.5.12)
+- [x] Cambio workspace resetta i risultati detection nello store (v0.5.13)
+- [x] Checkbox include/exclude per gruppo nel resolve duplicati (v0.5.13)
+- [x] Guardia destinazione frontend normalizzata (case/separatori) + blocco cartelle custom dentro il workspace (v0.5.13)
+- [x] `move_file`: fallback copy+delete per destinazioni su volumi diversi (v0.5.14)
+- [x] Trigger FTS5 + rebuild una tantum — indice full-text finalmente popolato (v0.5.15)
+- [x] `open_db` con `PRAGMA foreign_keys=ON`; stats senza errori mascherati (v0.5.15)
+- [x] Workspace inesistente = errore esplicito; upsert aggiorna size/format di file modificati (v0.5.15)
+- [x] Duplicati: lookup O(1), cross-check durata fase acustica, skip loser==keep, progress coerente (v0.5.15)
+- [x] Listener Tauri senza leak; doppio log rimosso; versione dinamica ovunque; uptime senza drift (v0.5.16)
+- [x] Logger: rotazione 5MB + timestamp con data; CSP attiva; plugin shell rimosso (v0.5.16)
+- [x] **Metadati reali**: estrazione tag con lofty (artist/title/album/genre/year/bitrate/sample_rate/duration) — fase metadata duplicati e best-pick finalmente operativi (v0.5.17)
 
 #### Fase 3 — The Conformer (Modulo B) — *In sviluppo: v0.6.0+*
 
