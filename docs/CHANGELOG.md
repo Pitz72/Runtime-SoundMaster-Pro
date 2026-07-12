@@ -6,6 +6,16 @@ Indice di tutte le versioni rilasciate. Ogni versione ha il proprio documento de
 
 ## Versioni
 
+### v0.5.12 — CREATE_NO_WINDOW: Stop ai Flash di Console in Release
+
+> 2026-07-12 · Fix grave UX release-only — criticità 5 dell'audit
+
+**Bug**: con `windows_subsystem = "windows"`, ogni processo figlio console (ffprobe per-file, fpcalc per-file, `where`) apriva una finestra console visibile in build release — su 36.000 track, 36.000 flash con furto di focus. Invisibile in dev perché la console del terminale viene ereditata. **Fix**: nuovo helper `hidden_command` in utils.rs con flag `CREATE_NO_WINDOW` (0x08000000), sostituito in tutti i call site `Command::new` del progetto (pass-through su macOS/Linux).
+
+[Dettaglio completo](log/0.5.12.md)
+
+---
+
 ### v0.5.11 — Workspace Isolation Radicale + Guardie Backend
 
 > 2026-07-12 · Fix critici data-safety — esito audit completo riga-per-riga

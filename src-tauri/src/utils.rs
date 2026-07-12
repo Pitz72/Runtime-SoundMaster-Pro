@@ -1,5 +1,5 @@
 /// utils.rs — Utilità condivise tra moduli
-/// Runtime SoundMaster Pro — v0.5.11
+/// Runtime SoundMaster Pro — v0.5.12
 ///
 /// Responsabilità:
 /// - `collision_safe_path`: naming collision-safe per quarantena file
@@ -7,6 +7,8 @@
 /// - `workspace_like_prefix`: pattern LIKE sicuro per filtrare i track di un
 ///   workspace (fix v0.5.11 — DB multi-workspace)
 /// - `canonical_or_raw`: canonicalizzazione tollerante per confronti di path
+/// - `hidden_command`: Command senza finestra console su Windows
+///   (fix v0.5.12 — flash di finestre in build release)
 
 use std::path::{Path, PathBuf};
 
@@ -41,6 +43,29 @@ pub fn workspace_like_prefix(workspace_path: &str) -> String {
 /// directory dove il confronto testuale non basta (Windows è case-insensitive).
 pub fn canonical_or_raw(p: &Path) -> PathBuf {
     std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf())
+}
+
+/// Crea un `Command` che su Windows NON apre una finestra console.
+///
+/// # Fix v0.5.12 (criticità 5 — audit 12/07/2026)
+/// L'app è compilata con `windows_subsystem = "windows"` (main.rs): il processo
+/// principale non ha una console. In questa condizione ogni processo figlio
+/// console (ffprobe, fpcalc, where) apre una propria finestra visibile per la
+/// durata dell'esecuzione. Con ffprobe/fpcalc lanciati una volta PER FILE,
+/// su una libreria da 36.000 track significa 36.000 flash di finestre in
+/// build release. `CREATE_NO_WINDOW` (0x08000000) sopprime la console del
+/// figlio. In dev (`tauri dev` da terminale) il problema non si vede perché
+/// la console viene ereditata — per questo non era mai emerso nei test.
+pub fn hidden_command<S: AsRef<std::ffi::OsStr>>(program: S) -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut cmd = std::process::Command::new(program);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
 }
 
 #[cfg(test)]

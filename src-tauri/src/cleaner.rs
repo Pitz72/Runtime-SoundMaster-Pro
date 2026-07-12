@@ -9,12 +9,11 @@
 /// - Aggiornamento `conforming_status = 'non_conform'` nel DB
 
 use crate::logger;
-use crate::utils::{canonical_or_raw, collision_safe_path, workspace_like_prefix};
+use crate::utils::{canonical_or_raw, collision_safe_path, hidden_command, workspace_like_prefix};
 use regex::Regex;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::process::Command;
 use std::sync::OnceLock;
 use tauri::{Emitter, Manager};
 
@@ -227,7 +226,8 @@ fn check_youtube_pattern(filename: &str, patterns: &[Regex]) -> Option<String> {
 /// con fallback al primo `streams[i].duration` trovato (per formati senza container
 /// duration, come certi stream raw o file audio in formato TS).
 fn probe_file(path: &str, ffprobe_path: &str) -> (bool, Option<f64>, Option<String>) {
-    let output = Command::new(ffprobe_path)
+    // hidden_command: niente flash di finestre console in release (fix v0.5.12)
+    let output = hidden_command(ffprobe_path)
         .args([
             "-v",
             "quiet",

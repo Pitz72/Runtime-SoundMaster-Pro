@@ -1,5 +1,5 @@
 /// fpcalc.rs — Rilevamento fpcalc (Chromaprint)
-/// Runtime SoundMaster Pro — v0.5.1
+/// Runtime SoundMaster Pro — v0.5.12
 ///
 /// Strategia di ricerca (in ordine di priorità):
 /// 1. Sidecar bundled nella resource dir Tauri
@@ -7,9 +7,9 @@
 /// 2. PATH di sistema
 /// 3. Percorsi comuni per OS
 
+use crate::utils::hidden_command;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::process::Command;
 use tauri::Manager;
 
 const TARGET: &str = env!("TARGET");
@@ -23,7 +23,7 @@ pub struct FpcalcInfo {
 }
 
 fn probe_fpcalc(path: &PathBuf) -> Option<String> {
-    let output = Command::new(path).arg("-version").output().ok()?;
+    let output = hidden_command(path).arg("-version").output().ok()?;
     if output.status.success() {
         let line = String::from_utf8_lossy(&output.stdout)
             .lines()
@@ -75,14 +75,14 @@ pub fn detect_fpcalc(app: &tauri::AppHandle) -> FpcalcInfo {
     let system_path = PathBuf::from(exe_name);
     if let Some(version) = probe_fpcalc(&system_path) {
         let full_path = if cfg!(target_os = "windows") {
-            Command::new("where")
+            hidden_command("where")
                 .arg("fpcalc")
                 .output()
                 .ok()
                 .and_then(|o| String::from_utf8(o.stdout).ok())
                 .map(|s| s.lines().next().unwrap_or("fpcalc").trim().to_string())
         } else {
-            Command::new("which")
+            hidden_command("which")
                 .arg("fpcalc")
                 .output()
                 .ok()

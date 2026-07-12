@@ -10,14 +10,13 @@
 /// - Aggiornamento `conforming_status = 'duplicate'` nel DB per i loser
 
 use crate::logger;
-use crate::utils::{canonical_or_raw, collision_safe_path, workspace_like_prefix};
+use crate::utils::{canonical_or_raw, collision_safe_path, hidden_command, workspace_like_prefix};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
-use std::process::Command;
 use tauri::{Emitter, Manager};
 
 // ── Strutture pubbliche ──────────────────────────────────────────────────────
@@ -218,7 +217,8 @@ fn sha256_file(path: &str) -> Option<String> {
 /// Esegue fpcalc e restituisce (fingerprint, duration_secs).
 /// Output atteso: "FINGERPRINT=<base64>\nDURATION=<secs>"
 fn run_fpcalc(path: &str, fpcalc_bin: &str) -> Option<(String, f64)> {
-    let output = Command::new(fpcalc_bin)
+    // hidden_command: niente flash di finestre console in release (fix v0.5.12)
+    let output = hidden_command(fpcalc_bin)
         .args(["-plain", path])
         .output()
         .ok()?;
