@@ -56,4 +56,4 @@
   - Installer setup NSIS (`Runtime SoundMaster Pro_0.5.18_x64-setup.exe`).
   - Installer MSI (`.msi`).
   - Eseguibile standalone portatile (`Runtime-SoundMaster-Pro-standalone.exe`).
-- **Attivazione**: Su push su branch `main`, su tag di release `v*`, oppure manualmente via `workflow_dispatch`.
+- **Attivazione**: Esclusivamente manuale via `workflow_dispatch` (tab Actions su GitHub -> Run workflow). Nessuna esecuzione automatica su push.
