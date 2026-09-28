@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;900&family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
-
+@import "./assets/fonts/fonts.css";
 @import "tailwindcss";
 
 @theme {
@@ -7,15 +6,18 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   --font-display: "Space Grotesk", sans-serif;
 
-  --color-industrial-bg: #131313;
-  --color-industrial-panel: #201f1f;
-  --color-industrial-border: #353534;
-  --color-industrial-amber: #ffb300;
-  --color-industrial-amber-dim: #ffd79b;
-  --color-industrial-cyan: #a4e7ff;
-  --color-industrial-red: #ffb3ac;
-  --color-industrial-text: #e5e2e1;
-  --color-industrial-text-dim: #a8a29e;
+  --color-industrial-bg: #0b0c10;
+  --color-industrial-panel: #12141a;
+  --color-industrial-surface: #171a22;
+  --color-industrial-border: #242936;
+  --color-industrial-border-light: #353c4d;
+  --color-industrial-amber: #ffaa00;
+  --color-industrial-amber-dim: #e69900;
+  --color-industrial-cyan: #00e5ff;
+  --color-industrial-green: #00e676;
+  --color-industrial-red: #ff3344;
+  --color-industrial-text: #e2e8f0;
+  --color-industrial-text-dim: #94a3b8;
 }
 
 @layer base {
@@ -28,11 +30,12 @@
   html, body, #root {
     height: 100%;
     width: 100%;
+    overflow: hidden;
   }
 
   body {
     @apply bg-industrial-bg text-industrial-text antialiased;
-    font-family: var(--font-display);
+    font-family: var(--font-sans);
     user-select: none;
   }
 
@@ -42,28 +45,36 @@
 }
 
 @layer utilities {
-  .glow-amber {
-    box-shadow: 0 0 20px rgba(255, 179, 0, 0.15);
+  .rack-bevel {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.6);
   }
-  .glow-amber-strong {
-    box-shadow: 0 0 30px rgba(255, 179, 0, 0.3);
+  .recessed-display {
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.75), inset 0 0 1px rgba(255, 255, 255, 0.05);
   }
-  .glow-cyan {
-    box-shadow: 0 0 20px rgba(164, 231, 255, 0.15);
+  .glow-amber-led {
+    box-shadow: 0 0 12px rgba(255, 170, 0, 0.45);
   }
-  .recessed-well {
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.5);
+  .glow-cyan-led {
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.45);
+  }
+  .glow-green-led {
+    box-shadow: 0 0 12px rgba(0, 230, 118, 0.45);
+  }
+  .glow-red-led {
+    box-shadow: 0 0 12px rgba(255, 51, 68, 0.5);
   }
   .custom-scrollbar::-webkit-scrollbar {
-    width: 4px;
+    width: 5px;
+    height: 5px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-industrial-bg;
+    background-color: #0b0c10;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-industrial-border;
+    background-color: #242936;
+    border-radius: 2px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-industrial-amber;
+    background-color: #ffaa00;
   }
 }

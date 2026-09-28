@@ -180,3 +180,24 @@ pub fn detect_ffprobe(app: &tauri::AppHandle) -> FfprobeInfo {
 pub fn detect_ffprobe_cmd(app: tauri::AppHandle) -> FfprobeInfo {
     detect_ffprobe(&app)
 }
+
+#[tauri::command]
+pub fn test_custom_ffprobe(path: String) -> FfprobeInfo {
+    let p = PathBuf::from(&path);
+    if p.exists() {
+        if let Some(version) = probe_ffprobe(&p) {
+            return FfprobeInfo {
+                found: true,
+                path: Some(p.to_string_lossy().to_string()),
+                version: Some(version),
+                source: Some("custom_path".to_string()),
+            };
+        }
+    }
+    FfprobeInfo {
+        found: false,
+        path: Some(path),
+        version: None,
+        source: Some("custom_path_invalid".to_string()),
+    }
+}

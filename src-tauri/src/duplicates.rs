@@ -248,6 +248,25 @@ fn run_fpcalc(path: &str, fpcalc_bin: &str) -> Option<(String, f64)> {
     }
 }
 
+/// Calcola la similarità acustica tra due fingerprint Chromaprint completi (CRIT-06 Resolved).
+/// Restituisce un valore tra 0.0 e 1.0 basato sulla corrispondenza dei vettori lungo l'intera traccia.
+fn acoustic_similarity(fp1: &str, fp2: &str) -> f64 {
+    if fp1.is_empty() || fp2.is_empty() {
+        return 0.0;
+    }
+    let min_len = fp1.len().min(fp2.len());
+    let max_len = fp1.len().max(fp2.len());
+    if max_len == 0 {
+        return 0.0;
+    }
+    // Se le lunghezze dei fingerprint differiscono di oltre il 15%, le strutture audio sono incompatibili
+    if (max_len - min_len) as f64 / max_len as f64 > 0.15 {
+        return 0.0;
+    }
+    let matches = fp1.chars().zip(fp2.chars()).filter(|(c1, c2)| c1 == c2).count();
+    matches as f64 / max_len as f64
+}
+
 // ── Logica detect (sincrona) ─────────────────────────────────────────────────
 
 fn detect_duplicates_impl(
@@ -324,6 +343,8 @@ fn detect_duplicates_impl(
             fpcalc_path.as_deref().unwrap_or("non disponibile — skip acoustic phase")
         ),
     );
+    crate::cancellation::reset_abort("duplicates");
+
     // Traccia quali id sono già stati assegnati a un gruppo
     let mut grouped_ids: std::collections::HashSet<i64> = std::collections::HashSet::new();
     let mut group_counter = 0u64;
@@ -359,8 +380,15 @@ fn detect_duplicates_impl(
 
     let mut processed_binary = 0u64;
     for group in &size_candidates {
+        if crate::cancellation::is_aborted("duplicates") {
+            logger::log_detail("DUPLICATES", "Annullamento richiesto durante Phase 1.");
+            break;
+        }
         let mut by_hash: HashMap<String, Vec<i64>> = HashMap::new();
         for t in *group {
+            if crate::cancellation::is_aborted("duplicates") {
+                break;
+            }
             processed_binary += 1;
             if processed_binary % 20 == 0 {
                 let _ = app.emit(
@@ -420,6 +448,10 @@ fn detect_duplicates_impl(
 
     let mut by_meta: HashMap<String, Vec<i64>> = HashMap::new();
     for (i, t) in tracks.iter().enumerate() {
+        if crate::cancellation::is_aborted("duplicates") {
+            logger::log_detail("DUPLICATES", "Annullamento richiesto durante Phase 2.");
+            break;
+        }
         if grouped_ids.contains(&t.id) {
             continue; // già trovato come duplicato binario
         }
@@ -469,39 +501,46 @@ fn detect_duplicates_impl(
 
     // ── Phase 3: Acoustic fingerprint (fpcalc — opzionale) ──────────────────
     if let Some(ref fpcalc_bin) = fpcalc_path {
-        let _ = app.emit(
-            "duplicate-progress",
-            DuplicateProgress {
-                phase: "acoustic".to_string(),
-                processed: 0,
-                total,
-                current_file: String::new(),
-                groups_found: groups.len() as u64,
-            },
-        );
+        if !crate::cancellation::is_aborted("duplicates") {
+            let _ = app.emit(
+                "duplicate-progress",
+                DuplicateProgress {
+                    phase: "acoustic".to_string(),
+                    processed: 0,
+                    total,
+                    current_file: String::new(),
+                    groups_found: groups.len() as u64,
+                },
+            );
 
-        let ungrouped: Vec<&TrackRow> = tracks
-            .iter()
-            .filter(|t| !grouped_ids.contains(&t.id))
-            .collect();
+            let ungrouped: Vec<&TrackRow> = tracks
+                .iter()
+                .filter(|t| !grouped_ids.contains(&t.id))
+                .collect();
 
-        let mut by_fingerprint: HashMap<String, Vec<i64>> = HashMap::new();
-        // Durata calcolata da fpcalc per ogni track — usata per il cross-check
-        // dei gruppi acustici (fix v0.5.15 — criticità 16)
-        let mut fp_durations: HashMap<i64, f64> = HashMap::new();
-        for (i, t) in ungrouped.iter().enumerate() {
-            if (i + 1) % 20 == 0 {
-                let _ = app.emit(
-                    "duplicate-progress",
-                    DuplicateProgress {
-                        phase: "acoustic".to_string(),
-                        processed: (i + 1) as u64,
-                        total: ungrouped.len() as u64,
-                        current_file: t.filename.clone(),
-                        groups_found: groups.len() as u64,
-                    },
-                );
-            }
+            let mut by_fingerprint: HashMap<String, Vec<i64>> = HashMap::new();
+            // Fingerprint completi e durate calcolate da fpcalc per ogni track
+            // (CRIT-06 Resolved: validazione incrociata a due stadi anti-jingle/intro)
+            let mut fp_durations: HashMap<i64, f64> = HashMap::new();
+            let mut fp_strings: HashMap<i64, String> = HashMap::new();
+
+            for (i, t) in ungrouped.iter().enumerate() {
+                if crate::cancellation::is_aborted("duplicates") {
+                    logger::log_detail("DUPLICATES", "Annullamento richiesto durante Phase 3.");
+                    break;
+                }
+                if (i + 1) % 20 == 0 {
+                    let _ = app.emit(
+                        "duplicate-progress",
+                        DuplicateProgress {
+                            phase: "acoustic".to_string(),
+                            processed: (i + 1) as u64,
+                            total: ungrouped.len() as u64,
+                            current_file: t.filename.clone(),
+                            groups_found: groups.len() as u64,
+                        },
+                    );
+                }
 
             if let Some((fp, dur)) = run_fpcalc(&t.path, fpcalc_bin) {
                 // Salva fingerprint nel DB per uso futuro
@@ -509,31 +548,23 @@ fn detect_duplicates_impl(
                     "UPDATE tracks SET fingerprint = ?1 WHERE id = ?2",
                     rusqlite::params![fp, t.id],
                 );
-                // Fix L5 (v0.5.6): popola duration_secs se assente nel DB.
-                // fpcalc calcola la durata decodificando il file — è affidabile
-                // quanto FFprobe. Utile per track aggiunti prima che FFprobe
-                // fosse disponibile o con metadati ID3 mancanti/corrotti.
-                // La condizione `AND duration_secs IS NULL` garantisce che non
-                // sovrascriva una duration già presente da FFprobe o dai tag ID3.
+                // Fix L5 (v0.5.6): popola duration_secs se assente nel DB
                 if t.duration_secs.is_none() && dur > 0.0 {
                     let _ = conn.execute(
                         "UPDATE tracks SET duration_secs = ?1 WHERE id = ?2 AND duration_secs IS NULL",
                         rusqlite::params![dur, t.id],
                     );
                 }
-                // Usa i primi 120 caratteri come chiave di confronto
-                // (fingerprint identici hanno stesso prefisso)
-                let key = fp.chars().take(120).collect::<String>();
+
+                // Prefisso ad alta selettività (280 caratteri ~ 35s audio) per il bucket iniziale
+                let key = fp.chars().take(280).collect::<String>();
                 fp_durations.insert(t.id, dur);
+                fp_strings.insert(t.id, fp);
                 by_fingerprint.entry(key).or_default().push(t.id);
             }
         }
 
-        // Cross-check durata (fix v0.5.15 — criticità 16): il prefisso a 120
-        // caratteri è un'euristica — brani diversi con intro molto simili
-        // possono condividerlo. Ogni bucket viene ordinato per durata e
-        // suddiviso dove il salto tra track consecutivi supera i 10 secondi:
-        // file con durate incompatibili non finiscono mai nello stesso gruppo.
+        // Cross-check durata e verifica similitudine globale (CRIT-06 Resolved)
         let duration_of = |id: i64| -> f64 {
             fp_durations
                 .get(&id)
@@ -550,12 +581,12 @@ fn detect_duplicates_impl(
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
 
-            // Partiziona in sottogruppi con durate contigue (gap <= 10s)
+            // Partiziona in sottogruppi con durate compatibili (tolleranza broadcast ristretta a 3.0s)
             let mut subgroups: Vec<Vec<i64>> = Vec::new();
             let mut current: Vec<i64> = Vec::new();
             for id in sorted_ids {
                 match current.last() {
-                    Some(&prev) if (duration_of(id) - duration_of(prev)).abs() > 10.0 => {
+                    Some(&prev) if (duration_of(id) - duration_of(prev)).abs() > 3.0 => {
                         subgroups.push(std::mem::take(&mut current));
                         current.push(id);
                     }
@@ -567,14 +598,41 @@ fn detect_duplicates_impl(
             }
 
             for sub_ids in subgroups.iter().filter(|v| v.len() >= 2) {
-                let members = members_of(sub_ids);
+                // Verifica similitudine sul fingerprint completo: previene raggruppamento
+                // errato di brani che condividono solo il jingle/intro iniziale
+                let pivot_id = sub_ids[0];
+                let pivot_fp = match fp_strings.get(&pivot_id) {
+                    Some(s) => s,
+                    None => continue,
+                };
+
+                let verified_ids: Vec<i64> = sub_ids
+                    .iter()
+                    .copied()
+                    .filter(|&id| {
+                        if id == pivot_id {
+                            return true;
+                        }
+                        if let Some(target_fp) = fp_strings.get(&id) {
+                            acoustic_similarity(pivot_fp, target_fp) >= 0.85
+                        } else {
+                            false
+                        }
+                    })
+                    .collect();
+
+                if verified_ids.len() < 2 {
+                    continue;
+                }
+
+                let members = members_of(&verified_ids);
                 let best_id = pick_best(&members);
                 group_counter += 1;
                 let filenames: Vec<&str> = members.iter().map(|t| t.filename.as_str()).collect();
                 logger::log_detail(
                     "DUPLICATES",
                     &format!(
-                        "GRUPPO acoustic [{}]: {} file — best_pick id={} ({})",
+                        "GRUPPO acoustic [{}]: {} file verificati — best_pick id={} ({})",
                         group_counter,
                         members.len(),
                         best_id,
@@ -584,19 +642,23 @@ fn detect_duplicates_impl(
                 groups.push(DuplicateGroup {
                     group_id: format!("dup-{group_counter}"),
                     match_type: "acoustic".to_string(),
-                    score: 90,
+                    score: 95,
                     files: to_duplicate_files(&members, best_id),
                     best_pick_id: best_id,
                 });
             }
         }
+        }
     }
+
+    let was_aborted = crate::cancellation::is_aborted("duplicates");
+    let phase = if was_aborted { "aborted" } else { "complete" };
 
     // Evento completamento
     let _ = app.emit(
         "duplicate-progress",
         DuplicateProgress {
-            phase: "complete".to_string(),
+            phase: phase.to_string(),
             processed: total,
             total,
             current_file: String::new(),

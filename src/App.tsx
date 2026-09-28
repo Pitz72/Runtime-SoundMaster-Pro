@@ -61,12 +61,29 @@ export default function App() {
         const version = await getVersion();
         setAppVersion(version);
 
-        const [db, ffmpeg, ffprobe, fpcalc] = await Promise.all([
+        let [db, ffmpeg, ffprobe, fpcalc] = await Promise.all([
           invoke<string>("db_status"),
           invoke<TauriFfmpegInfo>("detect_ffmpeg_cmd"),
           invoke<TauriFfprobeInfo>("detect_ffprobe_cmd"),
           invoke<TauriFpcalcInfo>("detect_fpcalc_cmd"),
         ]);
+
+        // Priorità configurazione personalizzata (CRIT-09 Resolved)
+        const customFfmpeg = localStorage.getItem('custom_ffmpeg_path');
+        if (customFfmpeg) {
+          const testRes = await invoke<TauriFfmpegInfo>("test_custom_ffmpeg", { path: customFfmpeg });
+          if (testRes.found) ffmpeg = testRes;
+        }
+        const customFfprobe = localStorage.getItem('custom_ffprobe_path');
+        if (customFfprobe) {
+          const testRes = await invoke<TauriFfprobeInfo>("test_custom_ffprobe", { path: customFfprobe });
+          if (testRes.found) ffprobe = testRes;
+        }
+        const customFpcalc = localStorage.getItem('custom_fpcalc_path');
+        if (customFpcalc) {
+          const testRes = await invoke<TauriFpcalcInfo>("test_custom_fpcalc", { path: customFpcalc });
+          if (testRes.found) fpcalc = testRes;
+        }
 
         setSystemStatus({
           db,

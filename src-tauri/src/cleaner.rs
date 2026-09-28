@@ -368,6 +368,8 @@ fn detect_non_conform_impl(
     let ffprobe = ffprobe_path.as_deref();
     let mut non_conform: Vec<NonConformItem> = Vec::new();
 
+    crate::cancellation::reset_abort("cleaner");
+
     logger::log_separator("CLEANER — NON-CONFORM DETECTION");
     logger::log_detail("CLEANER", &format!("Track da analizzare: {}", total));
     logger::log_detail(
@@ -391,6 +393,11 @@ fn detect_non_conform_impl(
     );
 
     for (i, track) in tracks.iter().enumerate() {
+        if crate::cancellation::is_aborted("cleaner") {
+            logger::log_detail("CLEANER", "Operazione di scansione interrotta dall'utente.");
+            break;
+        }
+
         let analyzed = (i + 1) as u64;
 
         // Emetti progress ogni 50 file o all'ultimo
@@ -493,6 +500,9 @@ fn detect_non_conform_impl(
         ),
     );
 
+    let was_aborted = crate::cancellation::is_aborted("cleaner");
+    let phase = if was_aborted { "aborted" } else { "complete" };
+
     // Evento completamento
     let _ = app.emit(
         "cleaner-progress",
@@ -500,7 +510,7 @@ fn detect_non_conform_impl(
             analyzed: total,
             total,
             current_file: String::new(),
-            phase: "complete".to_string(),
+            phase: phase.to_string(),
             found: non_conform.len() as u64,
         },
     );

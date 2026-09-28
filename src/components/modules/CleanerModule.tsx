@@ -112,11 +112,79 @@ function ProgressBar({ processed, total, label }: { processed: number; total: nu
   );
 }
 
+// ── PaginationBar (CRIT-05 Resolved: Prevenzione sovraccarico DOM) ───────────
+
+interface PaginationBarProps {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  itemLabel?: string;
+}
+
+function PaginationBar({
+  currentPage,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
+  itemLabel = 'elementi',
+}: PaginationBarProps) {
+  if (totalItems <= pageSize) return null;
+
+  const start = (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className="flex items-center justify-between py-2 px-3 bg-black/50 border border-industrial-border text-[9px] font-mono select-none my-1">
+      <span className="text-industrial-text-dim uppercase">
+        {start}–{end} di {totalItems.toLocaleString()} {itemLabel}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1}
+          className="px-2 py-0.5 border border-industrial-border text-industrial-text-dim hover:text-white disabled:opacity-20 disabled:pointer-events-none uppercase transition-all"
+          title="Prima pagina"
+        >
+          «
+        </button>
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="px-2 py-0.5 border border-industrial-border text-industrial-text-dim hover:text-white disabled:opacity-20 disabled:pointer-events-none uppercase transition-all"
+        >
+          PREV
+        </button>
+        <span className="px-2 py-0.5 text-industrial-amber font-bold">
+          {currentPage} / {totalPages}
+        </span>
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="px-2 py-0.5 border border-industrial-border text-industrial-text-dim hover:text-white disabled:opacity-20 disabled:pointer-events-none uppercase transition-all"
+        >
+          NEXT
+        </button>
+        <button
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage === totalPages}
+          className="px-2 py-0.5 border border-industrial-border text-industrial-text-dim hover:text-white disabled:opacity-20 disabled:pointer-events-none uppercase transition-all"
+          title="Ultima pagina"
+        >
+          »
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── CleanerModule ──────────────────────────────────────────────────────────
 
 export function CleanerModule() {
   const {
-    addLog, workspacePath, setWorkspacePath, systemStatus, appVersion,
+    addLog, workspacePath, setWorkspacePath, systemStatus,
     isScanning, setIsScanning, scanProgress,
     isCleanerRunning, setIsCleanerRunning, cleanerProgress, setCleanerProgress,
     nonConformItems, setNonConformItems,
@@ -136,6 +204,8 @@ export function CleanerModule() {
   const [ncSelectedIds, setNcSelectedIds] = useState<Set<number>>(new Set());
   const [ncQuarantineResult, setNcQuarantineResult] = useState<QuarantineResult | null>(null);
   const [ncTotalAnalyzed, setNcTotalAnalyzed] = useState(0);
+  const [ncPage, setNcPage] = useState(1);
+  const NC_PAGE_SIZE = 50;
 
   // ── Duplicates state ──
   const [dupStep, setDupStep] = useState<CleanerStep>(1);
@@ -143,6 +213,8 @@ export function CleanerModule() {
   // overrides: { group_id → keep_id } — per default è best_pick_id
   const [keepOverrides, setKeepOverrides] = useState<Record<string, number>>({});
   const [dupResolveResult, setDupResolveResult] = useState<DuplicateResolveResult | null>(null);
+  const [dupPage, setDupPage] = useState(1);
+  const DUP_PAGE_SIZE = 40;
   // Fix v0.5.13 (criticità 8): gruppi esclusi dal resolve. Prima il resolve
   // spostava i loser di TUTTI i gruppi, anche quelli mai aperti in review.
   const [excludedGroupIds, setExcludedGroupIds] = useState<Set<string>>(new Set());
@@ -156,6 +228,13 @@ export function CleanerModule() {
   const pathSep = workspacePath?.includes('\\') ? '\\' : '/';
   const ncDestPath = customNcDest ?? (workspacePath ? `${workspacePath}${pathSep}_NonConform` : null);
   const dupDestPath = customDupDest ?? (workspacePath ? `${workspacePath}${pathSep}_Duplicates` : null);
+
+  // Calcolo dati paginati per virtualizzazione leggera del DOM (CRIT-05 Resolved)
+  const ncTotalPages = Math.max(1, Math.ceil(nonConformItems.length / NC_PAGE_SIZE));
+  const paginatedNcItems = nonConformItems.slice((ncPage - 1) * NC_PAGE_SIZE, ncPage * NC_PAGE_SIZE);
+
+  const dupTotalPages = Math.max(1, Math.ceil(duplicateGroups.length / DUP_PAGE_SIZE));
+  const paginatedDupGroups = duplicateGroups.slice((dupPage - 1) * DUP_PAGE_SIZE, dupPage * DUP_PAGE_SIZE);
 
   // ── Workspace select + scan ────────────────────────────────────────────
   const handleSelectWorkspace = async () => {
@@ -269,6 +348,7 @@ export function CleanerModule() {
       setIsCleanerRunning(false);
       setCleanerProgress(null);
       setNcSelectedIds(new Set(result.items.map(i => i.id)));
+      setNcPage(1);
       addLog(
         result.non_conform_found > 0 ? 'warning' : 'success',
         `Analysis complete — ${result.non_conform_found} non-conform files found`,
@@ -324,7 +404,7 @@ export function CleanerModule() {
 
   const handleNcReset = () => {
     setNcStep(1); setNonConformItems([]); setNcSelectedIds(new Set());
-    setNcQuarantineResult(null); setNcTotalAnalyzed(0);
+    setNcQuarantineResult(null); setNcTotalAnalyzed(0); setNcPage(1);
   };
 
   // ── Duplicate handlers ─────────────────────────────────────────────────
@@ -338,6 +418,7 @@ export function CleanerModule() {
     setDupResolveResult(null);
     setSelectedGroupId(null);
     setExcludedGroupIds(new Set());
+    setDupPage(1);
     addLog('info', 'The Cleaner: starting duplicate analysis...', workspacePath);
     try {
       // workspacePath limita l'analisi al workspace corrente (fix v0.5.11 — DB multi-workspace)
@@ -348,6 +429,7 @@ export function CleanerModule() {
       setDuplicateGroups(result.groups);
       setIsDuplicateRunning(false);
       setDuplicateProgress(null);
+      setDupPage(1);
       if (result.groups.length > 0) setSelectedGroupId(result.groups[0].group_id);
       addLog(
         result.groups_found > 0 ? 'warning' : 'success',
@@ -412,7 +494,7 @@ export function CleanerModule() {
   const handleDupReset = () => {
     setDupStep(1); setDuplicateGroups([]); setKeepOverrides({});
     setDupResolveResult(null); setSelectedGroupId(null);
-    setExcludedGroupIds(new Set());
+    setExcludedGroupIds(new Set()); setDupPage(1);
   };
 
   // ── Render helpers ─────────────────────────────────────────────────────
@@ -420,64 +502,76 @@ export function CleanerModule() {
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 select-none">
 
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
+      {/* ── Header Rack Strip ─────────────────────────────────── */}
+      <div className="bg-industrial-panel border border-industrial-border p-4 rounded rack-bevel flex flex-col gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-industrial-amber/10 border border-industrial-amber/30">
-              <Eraser className="w-5 h-5 text-industrial-amber" />
+            <div className="p-2.5 bg-industrial-red/10 border border-industrial-red/30 rounded">
+              <Eraser className="w-5 h-5 text-industrial-red" />
             </div>
             <div>
-              <h2 className="text-2xl font-black font-sans tracking-tighter uppercase">THE CLEANER</h2>
-              <p className="text-[10px] font-mono text-industrial-text-dim uppercase tracking-widest">
-                Sanitization Pipeline v{appVersion}
+              <h2 className="text-xl font-black font-display tracking-tight uppercase text-white flex items-center gap-2">
+                STAGE 02 // THE CLEANER <span className="text-industrial-amber text-xs font-mono font-normal">// SANITIZATION BAY</span>
+              </h2>
+              <p className="text-[10px] font-mono text-industrial-text-dim uppercase tracking-wider">
+                Pattern Matching // FFprobe Video Stream Isolation // Dual-Stage Acoustic Deduplication
               </p>
             </div>
           </div>
 
-          {/* Mode switcher */}
-          <div className="flex items-center gap-px bg-industrial-border p-px">
+          {/* Mode switcher broadcast buttons */}
+          <div className="flex items-center gap-1 bg-black p-1 border border-industrial-border rounded">
             <button
               onClick={() => setMode('nonconform')}
-              className={`px-5 py-2 text-[10px] font-mono font-bold uppercase tracking-widest transition-all ${
+              className={`px-4 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded transition-all flex items-center gap-2 ${
                 mode === 'nonconform'
-                  ? 'bg-industrial-amber text-black'
-                  : 'bg-industrial-panel text-industrial-text-dim hover:text-white'
+                  ? 'bg-industrial-red text-black font-black glow-red-led'
+                  : 'text-industrial-text-dim hover:text-white'
               }`}
             >
-              Non-Conform
+              <span className={`w-1.5 h-1.5 rounded-full ${mode === 'nonconform' ? 'bg-black' : 'bg-industrial-red'}`} />
+              02-A // Non-Conform
             </button>
             <button
               onClick={() => setMode('duplicates')}
-              className={`px-5 py-2 text-[10px] font-mono font-bold uppercase tracking-widest transition-all ${
+              className={`px-4 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded transition-all flex items-center gap-2 ${
                 mode === 'duplicates'
-                  ? 'bg-industrial-amber text-black'
-                  : 'bg-industrial-panel text-industrial-text-dim hover:text-white'
+                  ? 'bg-industrial-amber text-black font-black glow-amber-led'
+                  : 'text-industrial-text-dim hover:text-white'
               }`}
             >
-              Duplicates
+              <span className={`w-1.5 h-1.5 rounded-full ${mode === 'duplicates' ? 'bg-black' : 'bg-industrial-amber'}`} />
+              02-B // Duplicates
             </button>
           </div>
         </div>
 
-        {/* Step indicator */}
-        <div className="grid grid-cols-3 gap-px bg-industrial-border">
+        {/* Step indicator rack */}
+        <div className="grid grid-cols-3 gap-2 pt-1 border-t border-industrial-border/60">
           {stepsConfig.map((s) => (
             <div
               key={s.step}
-              className={`p-4 flex flex-col items-center justify-center transition-all ${
+              className={`p-2.5 rounded border transition-all flex items-center justify-between ${
                 currentStep === s.step
-                  ? 'bg-industrial-amber text-black'
+                  ? 'bg-industrial-surface border-industrial-amber text-white'
                   : currentStep > s.step
-                    ? 'bg-industrial-panel text-industrial-cyan'
-                    : 'bg-industrial-panel text-industrial-text-dim'
+                    ? 'bg-industrial-panel/50 border-industrial-green/40 text-industrial-green'
+                    : 'bg-black/30 border-industrial-border/40 text-industrial-text-dim/60'
               }`}
             >
-              <span className="text-[10px] font-mono font-black mb-1">STEP 0{s.step}</span>
-              <span className="text-xs font-black uppercase tracking-widest">{s.label}</span>
-              <span className="text-[8px] font-mono uppercase opacity-60">{s.desc}</span>
+              <div>
+                <span className="text-[8px] font-mono font-black uppercase tracking-wider block opacity-70">
+                  STEP 0{s.step}
+                </span>
+                <span className="text-xs font-bold font-display uppercase tracking-tight">
+                  {s.label}
+                </span>
+              </div>
+              <span className="text-[9px] font-mono uppercase hidden sm:block opacity-60">
+                {s.desc}
+              </span>
             </div>
           ))}
         </div>
@@ -578,6 +672,20 @@ export function CleanerModule() {
                       <p className="text-[9px] font-mono text-industrial-cyan uppercase">
                         {cleanerProgress.found} non-conform detected so far
                       </p>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await invoke('abort_task', { taskName: 'cleaner' });
+                            addLog('warning', 'Non-conform analysis abort requested by operator.');
+                          } catch (e) {
+                            addLog('error', 'Failed to abort cleaner', String(e));
+                          }
+                        }}
+                        className="mt-2 px-6 py-2 border border-industrial-magenta text-industrial-magenta hover:bg-industrial-magenta hover:text-black font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        <span className="w-1.5 h-1.5 bg-industrial-magenta animate-ping rounded-full" />
+                        ABORT ANALYSIS
+                      </button>
                     </div>
                   )}
                   {/* Progress bar scansione workspace — visibile solo durante isScanning */}
@@ -647,8 +755,16 @@ export function CleanerModule() {
                   </div>
                 ) : (
                   <>
+                    <PaginationBar
+                      currentPage={ncPage}
+                      totalPages={ncTotalPages}
+                      totalItems={nonConformItems.length}
+                      pageSize={NC_PAGE_SIZE}
+                      onPageChange={setNcPage}
+                      itemLabel="file non-conformi"
+                    />
                     <div className="space-y-1 max-h-[480px] overflow-y-auto pr-1 custom-scrollbar">
-                      {nonConformItems.map(item => (
+                      {paginatedNcItems.map(item => (
                         <button
                           key={item.id}
                           onClick={() => toggleNcItem(item.id)}
@@ -676,6 +792,14 @@ export function CleanerModule() {
                         </button>
                       ))}
                     </div>
+                    <PaginationBar
+                      currentPage={ncPage}
+                      totalPages={ncTotalPages}
+                      totalItems={nonConformItems.length}
+                      pageSize={NC_PAGE_SIZE}
+                      onPageChange={setNcPage}
+                      itemLabel="file non-conformi"
+                    />
                     <div className="flex items-center justify-between pt-2">
                       <button onClick={handleNcReset} className="text-industrial-text-dim text-[10px] font-mono uppercase hover:text-white transition-all underline underline-offset-4">Re-scan</button>
                       <button
@@ -843,6 +967,20 @@ export function CleanerModule() {
                       <p className="text-[9px] font-mono text-industrial-cyan uppercase">
                         {duplicateProgress.groups_found} groups detected so far
                       </p>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await invoke('abort_task', { taskName: 'duplicates' });
+                            addLog('warning', 'Duplicate scan abort requested by operator.');
+                          } catch (e) {
+                            addLog('error', 'Failed to abort duplicate scan', String(e));
+                          }
+                        }}
+                        className="mt-2 px-6 py-2 border border-industrial-magenta text-industrial-magenta hover:bg-industrial-magenta hover:text-black font-bold text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2"
+                      >
+                        <span className="w-1.5 h-1.5 bg-industrial-magenta animate-ping rounded-full" />
+                        ABORT SCAN
+                      </button>
                     </div>
                   )}
 
@@ -924,8 +1062,16 @@ export function CleanerModule() {
                           {excludedGroupIds.size === 0 ? 'Deselect All' : 'Select All'}
                         </button>
                       </div>
+                      <PaginationBar
+                        currentPage={dupPage}
+                        totalPages={dupTotalPages}
+                        totalItems={duplicateGroups.length}
+                        pageSize={DUP_PAGE_SIZE}
+                        onPageChange={setDupPage}
+                        itemLabel="gruppi duplicati"
+                      />
                       <div className="space-y-1 max-h-[440px] overflow-y-auto pr-1 custom-scrollbar">
-                        {duplicateGroups.map(g => {
+                        {paginatedDupGroups.map(g => {
                           const included = !excludedGroupIds.has(g.group_id);
                           return (
                             <div
@@ -965,6 +1111,14 @@ export function CleanerModule() {
                           );
                         })}
                       </div>
+                      <PaginationBar
+                        currentPage={dupPage}
+                        totalPages={dupTotalPages}
+                        totalItems={duplicateGroups.length}
+                        pageSize={DUP_PAGE_SIZE}
+                        onPageChange={setDupPage}
+                        itemLabel="gruppi duplicati"
+                      />
                       <button
                         onClick={() => setDupStep(3)}
                         disabled={includedGroups.length === 0}

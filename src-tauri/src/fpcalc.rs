@@ -172,3 +172,24 @@ pub fn detect_fpcalc(app: &tauri::AppHandle) -> FpcalcInfo {
 pub fn detect_fpcalc_cmd(app: tauri::AppHandle) -> FpcalcInfo {
     detect_fpcalc(&app)
 }
+
+#[tauri::command]
+pub fn test_custom_fpcalc(path: String) -> FpcalcInfo {
+    let p = PathBuf::from(&path);
+    if p.exists() {
+        if let Some(version) = probe_fpcalc(&p) {
+            return FpcalcInfo {
+                found: true,
+                path: Some(p.to_string_lossy().to_string()),
+                version: Some(version),
+                source: Some("custom_path".to_string()),
+            };
+        }
+    }
+    FpcalcInfo {
+        found: false,
+        path: Some(path),
+        version: None,
+        source: Some("custom_path_invalid".to_string()),
+    }
+}

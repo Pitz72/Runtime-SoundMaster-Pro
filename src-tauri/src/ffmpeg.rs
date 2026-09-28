@@ -189,3 +189,24 @@ pub fn detect_ffmpeg(app: &tauri::AppHandle) -> FfmpegInfo {
 pub fn detect_ffmpeg_cmd(app: tauri::AppHandle) -> FfmpegInfo {
     detect_ffmpeg(&app)
 }
+
+#[tauri::command]
+pub fn test_custom_ffmpeg(path: String) -> FfmpegInfo {
+    let p = PathBuf::from(&path);
+    if p.exists() {
+        if let Some(version) = probe_ffmpeg(&p) {
+            return FfmpegInfo {
+                found: true,
+                path: Some(p.to_string_lossy().to_string()),
+                version: Some(version),
+                source: Some("custom_path".to_string()),
+            };
+        }
+    }
+    FfmpegInfo {
+        found: false,
+        path: Some(path),
+        version: None,
+        source: Some("custom_path_invalid".to_string()),
+    }
+}

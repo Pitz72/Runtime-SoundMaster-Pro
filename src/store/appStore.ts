@@ -1,6 +1,6 @@
 /**
  * appStore.ts — Zustand Store Globale
- * Runtime SoundMaster Pro v0.5.10
+ * Runtime SoundMaster Pro v0.5.18
  *
  * Stato globale dell'applicazione:
  * - Navigazione tra Hub e moduli
@@ -244,7 +244,7 @@ export const useAppStore = create<AppState>((set) => ({
       };
       return {
         currentModule: module,
-        logs: [...state.logs, entry].slice(-200), // max 200 entries
+        logs: [...state.logs, entry].slice(-1000), // max 1000 entries (CRIT-11 Resolved)
       };
     }),
 
@@ -342,7 +342,7 @@ export const useAppStore = create<AppState>((set) => ({
           message,
           detail,
         },
-      ].slice(-200),
+      ].slice(-1000), // max 1000 entries (CRIT-11 Resolved)
     })),
   clearLogs: () =>
     set({

@@ -1,12 +1,15 @@
 /// lib.rs — Entry point Tauri
 /// Runtime SoundMaster Pro — v0.5.11
 
+mod cancellation;
 mod cleaner;
+mod conformer;
 mod db;
 mod duplicates;
 mod ffmpeg;
 mod ffprobe;
 mod fpcalc;
+mod librarian;
 mod logger;
 mod scanner;
 mod utils;
@@ -34,13 +37,25 @@ pub fn run() {
             db::db_status,
             db::get_library_stats,
             ffmpeg::detect_ffmpeg_cmd,
+            ffmpeg::test_custom_ffmpeg,
             ffprobe::detect_ffprobe_cmd,
+            ffprobe::test_custom_ffprobe,
             fpcalc::detect_fpcalc_cmd,
+            fpcalc::test_custom_fpcalc,
+            cancellation::abort_task,
+            cancellation::is_task_aborted,
             scanner::scan_workspace,
             cleaner::detect_non_conform,
             cleaner::quarantine_non_conform,
             duplicates::detect_duplicates,
             duplicates::resolve_duplicates,
+            conformer::get_conformer_queue,
+            conformer::conform_batch,
+            librarian::get_librarian_tracks,
+            librarian::save_track_metadata,
+            librarian::bulk_update_metadata,
+            librarian::scrub_track_tags,
+            librarian::extract_embedded_artwork,
             logger::get_log_path,
         ])
         .run(tauri::generate_context!())

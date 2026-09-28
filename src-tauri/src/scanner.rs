@@ -193,6 +193,7 @@ fn scan_workspace_impl(
     // La purga è limitata al workspace corrente: record di altri workspace
     // (potenzialmente su drive non montati) non vengono toccati.
     let mut orphan_ids: Vec<i64> = Vec::new();
+    let mut total_workspace_existing = 0usize;
     {
         let mut stmt = conn
             .prepare("SELECT id, path FROM tracks WHERE path LIKE ?1 ESCAPE '!'")
@@ -203,12 +204,33 @@ fn scan_workspace_impl(
             })
             .map_err(|e| format!("Scanner: orphan query failed: {e}"))?;
         for (id, path) in rows.filter_map(|r| r.ok()) {
+            total_workspace_existing += 1;
             if !Path::new(&path).exists() {
                 orphan_ids.push(id);
             }
         }
     }
-    if !orphan_ids.is_empty() {
+
+    // ── Safe Orphan Purge Circuit-Breaker (fix CRIT-02) ───────────────────
+    // Se il volume o il percorso di rete è stato disconnesso temporaneamente,
+    // tutti i file risulterebbero mancanti. Per evitare la cancellazione
+    // catastrofica dell'intero catalogo SQLite (fingerprint, cover art, FTS),
+    // se mancano più del 30% dei file (su almeno 10 file registrati) la purga
+    // automatica viene sospesa e viene registrato un allarme di protezione.
+    let is_mass_disconnection = total_workspace_existing >= 10
+        && ((orphan_ids.len() as f64 / total_workspace_existing as f64) > 0.30);
+
+    if is_mass_disconnection {
+        logger::log_detail(
+            "SCANNER",
+            &format!(
+                "PROTEZIONE ATTIVA: Rilevati {} file mancanti su {} ({:.1}%). Possibile volume scollegato o storage non pronto. Purga orfani sospesa per salvaguardare il database.",
+                orphan_ids.len(),
+                total_workspace_existing,
+                (orphan_ids.len() as f64 / total_workspace_existing as f64) * 100.0
+            ),
+        );
+    } else if !orphan_ids.is_empty() {
         let tx = conn
             .unchecked_transaction()
             .map_err(|e| format!("Scanner: purge transaction failed: {e}"))?;
@@ -255,6 +277,7 @@ fn scan_workspace_impl(
     }
 
     // Crea il record di sessione scansione
+    crate::cancellation::reset_abort("scan");
     conn.execute(
         "INSERT INTO scans (root_path, status) VALUES (?1, 'running')",
         [&workspace_path],
@@ -339,23 +362,16 @@ fn scan_workspace_impl(
         }
     }
 
-    // --- Fase 2: Indicizzazione DB-First (stream diretto, senza collect) ---
-    // Upsert (fix v0.5.15 — criticità 14): il vecchio INSERT OR IGNORE non
-    // aggiornava mai file_size/format/scan_id di file già indicizzati — se un
-    // file cambiava su disco, il pre-filtro per dimensione dei duplicati
-    // lavorava su dati stale. ON CONFLICT aggiorna i campi filesystem
+    // --- Fase 2: Indicizzazione DB-First con Transazioni a Chunk (CRIT-04 Resolved) ---
+    // Upsert (fix v0.5.15 — criticità 14): ON CONFLICT aggiorna i campi filesystem
     // preservando i metadati (artist/title/...) e lo status.
     //
-    // Estrazione metadati (fix v0.5.17 — criticità 10): prima di questa
-    // versione NESSUN modulo popolava artist/title/bitrate/duration — la fase
-    // "metadata" dei duplicati era di fatto morta e il best-pick decideva solo
-    // su formato+dimensione. I tag vengono letti con lofty (crate nativo,
-    // nessun subprocess) solo per i file nuovi/modificati/mai taggati: i
-    // rescan su librerie già taggate restano veloci.
+    // Estrazione metadati (fix v0.5.17 — criticità 10): i tag vengono letti con
+    // lofty solo per file nuovi/modificati/mai taggati: i rescan restano ultra-veloci.
     //
-    // L'intero pass gira in una transazione unica: 36k upsert+update in
-    // autocommit sarebbero 36k commit WAL. La scansione è ri-eseguibile,
-    // quindi la perdita del batch in caso di crash è accettabile.
+    // Transazioni a blocchi (fix v0.5.18 — criticità 04): invece di un'unica
+    // transazione monolitica (che causava WAL da centinaia di MB e perdita totale
+    // del lavoro in caso di interruzione), eseguiamo commit periodici ogni 1.000 file.
     let rows_before: i64 = conn
         .query_row("SELECT COUNT(*) FROM tracks", [], |r| r.get(0))
         .unwrap_or(0);
@@ -364,107 +380,140 @@ fn scan_workspace_impl(
     let mut tags_read = 0u64;
     let mut tag_failures = 0u64;
 
-    let tx = conn
-        .unchecked_transaction()
-        .map_err(|e| format!("Scanner: index transaction failed: {e}"))?;
-    {
-        let mut upsert = tx
-            .prepare(
-                "INSERT INTO tracks
-                 (path, filename, format, file_size_bytes, scan_id, conforming_status)
-                 VALUES (?1, ?2, ?3, ?4, ?5, 'unknown')
-                 ON CONFLICT(path) DO UPDATE SET
-                   filename = excluded.filename,
-                   format = excluded.format,
-                   file_size_bytes = excluded.file_size_bytes,
-                   scan_id = excluded.scan_id",
-            )
-            .map_err(|e| format!("Scanner: cannot prepare statement: {e}"))?;
+    const CHUNK_SIZE: usize = 1000;
+    let mut walk_iter = WalkDir::new(&workspace_path)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| is_audio_file(e));
 
-        // COALESCE su duration_secs: non sovrascrive una durata già presente
-        // (es. calcolata da fpcalc) con NULL se i tag non la riportano.
-        let mut tag_update = tx
-            .prepare(
-                "UPDATE tracks SET
-                   artist = ?1, title = ?2, album = ?3, genre = ?4, year = ?5,
-                   bitrate = ?6, sample_rate = ?7,
-                   duration_secs = COALESCE(?8, duration_secs)
-                 WHERE path = ?9",
-            )
-            .map_err(|e| format!("Scanner: cannot prepare tag statement: {e}"))?;
+    loop {
+        if crate::cancellation::is_aborted("scan") {
+            logger::log_detail("SCANNER", "Scansione interrotta dall'utente.");
+            let _ = app.emit(
+                "scan-progress",
+                ScanProgress {
+                    scanned,
+                    total,
+                    current_file: String::from("Interrotto dall'utente"),
+                    phase: String::from("complete"),
+                },
+            );
+            break;
+        }
 
-        for entry in WalkDir::new(&workspace_path)
-            .follow_links(true)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| is_audio_file(e))
-        {
-            scanned += 1;
-            let path = entry.path();
-
-            let filename = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-
-            let format = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("unknown")
-                .to_lowercase();
-
-            let file_size = std::fs::metadata(path)
-                .map(|m| m.len() as i64)
-                .unwrap_or(0);
-
-            let path_str = path.to_string_lossy().to_string();
-
-            let _ = upsert.execute(params![path_str, filename, format, file_size, scan_id]);
-
-            // Tag da leggere solo se: file nuovo, dimensione cambiata,
-            // o record esistente senza artist (indicizzato pre-v0.5.17)
-            let needs_tags = match existing.get(&path_str) {
-                Some((known_size, has_artist)) => *known_size != file_size || !*has_artist,
-                None => true,
-            };
-
-            if needs_tags {
-                match read_tags(path) {
-                    Some(meta) => {
-                        tags_read += 1;
-                        let _ = tag_update.execute(params![
-                            meta.artist,
-                            meta.title,
-                            meta.album,
-                            meta.genre,
-                            meta.year,
-                            meta.bitrate_kbps,
-                            meta.sample_rate,
-                            meta.duration_secs,
-                            path_str
-                        ]);
-                    }
-                    None => tag_failures += 1,
-                }
-            }
-
-            if scanned % 100 == 0 || scanned == total {
-                app.emit(
-                    "scan-progress",
-                    ScanProgress {
-                        scanned,
-                        total,
-                        current_file: filename,
-                        phase: String::from("indexing"),
-                    },
-                )
-                .ok();
+        let mut chunk = Vec::with_capacity(CHUNK_SIZE);
+        for _ in 0..CHUNK_SIZE {
+            if let Some(entry) = walk_iter.next() {
+                chunk.push(entry);
+            } else {
+                break;
             }
         }
+
+        if chunk.is_empty() {
+            break;
+        }
+
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| format!("Scanner: index transaction failed: {e}"))?;
+
+        {
+            let mut upsert = tx
+                .prepare(
+                    "INSERT INTO tracks
+                     (path, filename, format, file_size_bytes, scan_id, conforming_status)
+                     VALUES (?1, ?2, ?3, ?4, ?5, 'unknown')
+                     ON CONFLICT(path) DO UPDATE SET
+                       filename = excluded.filename,
+                       format = excluded.format,
+                       file_size_bytes = excluded.file_size_bytes,
+                       scan_id = excluded.scan_id",
+                )
+                .map_err(|e| format!("Scanner: cannot prepare statement: {e}"))?;
+
+            // COALESCE su duration_secs: non sovrascrive una durata già presente
+            // (es. calcolata da fpcalc) con NULL se i tag non la riportano.
+            let mut tag_update = tx
+                .prepare(
+                    "UPDATE tracks SET
+                       artist = ?1, title = ?2, album = ?3, genre = ?4, year = ?5,
+                       bitrate = ?6, sample_rate = ?7,
+                       duration_secs = COALESCE(?8, duration_secs)
+                     WHERE path = ?9",
+                )
+                .map_err(|e| format!("Scanner: cannot prepare tag statement: {e}"))?;
+
+            for entry in chunk {
+                scanned += 1;
+                let path = entry.path();
+
+                let filename = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+
+                let format = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("unknown")
+                    .to_lowercase();
+
+                let file_size = std::fs::metadata(path)
+                    .map(|m| m.len() as i64)
+                    .unwrap_or(0);
+
+                let path_str = path.to_string_lossy().to_string();
+
+                let _ = upsert.execute(params![path_str, filename, format, file_size, scan_id]);
+
+                // Tag da leggere solo se: file nuovo, dimensione cambiata,
+                // o record esistente senza artist (indicizzato pre-v0.5.17)
+                let needs_tags = match existing.get(&path_str) {
+                    Some((known_size, has_artist)) => *known_size != file_size || !*has_artist,
+                    None => true,
+                };
+
+                if needs_tags {
+                    match read_tags(path) {
+                        Some(meta) => {
+                            tags_read += 1;
+                            let _ = tag_update.execute(params![
+                                meta.artist,
+                                meta.title,
+                                meta.album,
+                                meta.genre,
+                                meta.year,
+                                meta.bitrate_kbps,
+                                meta.sample_rate,
+                                meta.duration_secs,
+                                path_str
+                            ]);
+                        }
+                        None => tag_failures += 1,
+                    }
+                }
+
+                if scanned % 100 == 0 || scanned == total {
+                    app.emit(
+                        "scan-progress",
+                        ScanProgress {
+                            scanned,
+                            total,
+                            current_file: filename,
+                            phase: String::from("indexing"),
+                        },
+                    )
+                    .ok();
+                }
+            }
+        }
+
+        tx.commit()
+            .map_err(|e| format!("Scanner: index commit failed: {e}"))?;
     }
-    tx.commit()
-        .map_err(|e| format!("Scanner: index commit failed: {e}"))?;
 
     if tags_read > 0 || tag_failures > 0 {
         logger::log_detail(
